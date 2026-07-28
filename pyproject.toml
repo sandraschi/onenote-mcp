@@ -1,4 +1,4 @@
-﻿[project]
+[project]
 name = "onenote-mcp"
 version = "1.0.0"
 description = "FastMCP 3.1.0+ server for Microsoft OneNote integration"
