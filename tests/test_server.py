@@ -1,36 +1,38 @@
 """Basic tests for onenote-mcp server."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock
+
 
 def test_server_imports():
     """Test that the server module can be imported."""
     try:
         from onenote_mcp.server import app
+
         assert app is not None
     except ImportError as e:
         pytest.skip(f"Server import failed: {e}")
 
+
 def test_server_initialization():
-    """Test that the server can be initialized."""
+    """Test that the FastMCP app can be initialized."""
     try:
         from onenote_mcp.server import app
-        # Basic check that FastAPI app was created
-        assert hasattr(app, 'routes')
+
+        assert app.name == "onenote-mcp"
     except ImportError:
         pytest.skip("Server import failed")
+
 
 @pytest.mark.asyncio
 async def test_health_check():
     """Test the health check endpoint."""
     try:
         from onenote_mcp.server import health_check
-        result = await health_check()
-        assert isinstance(result, dict)
-        assert "status" in result
+
+        request = MagicMock()
+        response = await health_check(request)
+        assert response.body is not None
+        assert b"healthy" in response.body
     except ImportError:
         pytest.skip("Server import failed")
-
-
-
-
