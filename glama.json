@@ -1,0 +1,42 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": ["sandraschi"],
+  "name": "onenote-mcp",
+  "description": "Microsoft OneNote integration via Microsoft Graph API. Complete notebook, section, and page management with text extraction and content operations.",
+  "type": "mcp_server",
+  "status": "alpha",
+  "framework": "FastMCP 2.13+",
+  "tools": 10,
+  "transport": ["stdio"],
+  "keywords": [
+    "onenote",
+    "microsoft-graph",
+    "notebooks",
+    "sections",
+    "pages",
+    "office-365",
+    "text-extraction",
+    "fastmcp"
+  ],
+  "features": {
+    "notebook_management": {
+      "enabled": true,
+      "operations": ["list", "create", "read", "update"],
+      "hierarchy": ["notebooks", "sections", "pages"]
+    },
+    "content_operations": {
+      "enabled": true,
+      "capabilities": ["text-extraction", "html-parsing", "content-creation"]
+    },
+    "authentication": {
+      "enabled": true,
+      "method": "microsoft-graph-api",
+      "features": ["oauth2", "token-management"]
+    },
+    "integration": {
+      "enabled": true,
+      "platforms": ["office-365", "microsoft-account"],
+      "features": ["cross-platform-sync", "sharing"]
+    }
+  }
+}
