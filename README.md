@@ -5,6 +5,9 @@
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
   <a href="https://github.com/PrefectHQ/fastmcp"><img src="https://img.shields.io/badge/FastMCP-3.4-7c5cfc?style=flat-square" alt="FastMCP"></a>
+  <a href="https://github.com/sandraschi/onenote-mcp"><img src="https://img.shields.io/github/stars/sandraschi/onenote-mcp?style=flat-square&logo=github" alt="Stars"></a>
+  <a href="https://github.com/sandraschi/onenote-mcp/blob/main/LICENSE"><img src="https://img.shields.io/github/license/sandraschi/onenote-mcp?style=flat-square" alt="License"></a>
+  <a href="https://glama.ai/mcp/servers/@sandraschi/onenote-mcp"><img src="https://img.shields.io/badge/Glama-MCP_Server-4A90D9?style=flat-square" alt="Glama"></a>
 </p>
 
 
