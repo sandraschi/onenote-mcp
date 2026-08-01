@@ -55,6 +55,7 @@ jobs:
           $toml = Get-Content pyproject.toml -Raw -ErrorAction SilentlyContinue
           $hasGroupDev = $false
           $hasExtraDev = $false
+          $hasGroupTest = $false
           if ($toml) {
             $inGroups = $false
             $inExtras = $false
@@ -64,12 +65,16 @@ jobs:
               if ($t -match '^\[project\.optional-dependencies\]\s*$') { $inGroups = $false; $inExtras = $true; continue }
               if ($t -match '^\[') { $inGroups = $false; $inExtras = $false; continue }
               if ($inGroups -and $t -match '^dev\s*=') { $hasGroupDev = $true }
+              if ($inGroups -and $t -match '^test\s*=') { $hasGroupTest = $true }
               if ($inExtras -and $t -match '^dev\s*=') { $hasExtraDev = $true }
             }
           }
-          if ($hasGroupDev) {
-            Write-Host "Using uv sync --group dev (dependency-groups)"
-            uv sync --group dev
+          $syncArgs = @()
+          if ($hasGroupDev) { $syncArgs += '--group'; $syncArgs += 'dev' }
+          if ($hasGroupTest) { $syncArgs += '--group'; $syncArgs += 'test' }
+          if ($syncArgs.Count -gt 0) {
+            Write-Host "Using uv sync $($syncArgs -join ' ')"
+            uv sync @syncArgs
           } elseif ($hasExtraDev) {
             Write-Host "Using uv sync --extra dev (optional-dependencies)"
             uv sync --extra dev
