@@ -1,19 +1,33 @@
 """FastMCP server for Microsoft OneNote integration."""
 
+import asyncio
 import json
+import logging
 import os
+import sys
+import time
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
 import msal
 from fastmcp import FastMCP
 from fastmcp.server import create_proxy
+from pydantic import Field
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from .constants import CLIENT_ID, SCOPES, TOKEN_FILE_NAME
 from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("onenote_mcp")
+_SERVER_VERSION = "1.0.0"
+_START_TIME = time.monotonic()
+
+# Fire-and-forget shutdown tasks (stored to satisfy RUF006)
+_shutdown_tasks: list[asyncio.Task] = []
 
 # Get the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -252,6 +266,132 @@ async def health_check(request: Request) -> JSONResponse:
     return JSONResponse({"status": "healthy", "server": "onenote-mcp"})
 
 
+# ---- Webapp REST API (fleet SOTA endpoints) ----
+
+_TAGGED_SKILLS: list[dict[str, str]] = []
+_HELP_TOOLS: list[dict[str, str]] = []
+
+
+_TOOL_REGISTRY: tuple[str, ...] = (
+    "authenticate",
+    "onenote_save_access_token",
+    "onenote_list_notebooks",
+    "onenote_get_notebook",
+    "onenote_list_sections",
+    "onenote_list_pages",
+    "onenote_get_page",
+    "onenote_create_page",
+    "onenote_search_pages",
+    "onenote_get_notebook_toc",
+    "onenote_help",
+    "shutdown_server",
+)
+
+
+def _list_mcp_tools() -> list[dict[str, str]]:
+    """Return registered MCP tools as name/description dicts."""
+    try:
+        return [{"name": name, "description": ""} for name in _TOOL_REGISTRY]
+    except Exception:
+        return [{"name": name, "description": ""} for name in _TOOL_REGISTRY]
+
+
+def _tool_count() -> int:
+    return len(_list_mcp_tools())
+
+
+@app.custom_route("/api/status", methods=["GET"])
+async def api_status(request: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "status": "ok",
+            "server": "onenote-mcp",
+            "version": _SERVER_VERSION,
+            "uptime_seconds": int(time.monotonic() - _START_TIME),
+            "tool_count": _tool_count(),
+            "providers": {"graph": {"authenticated": bool(load_access_token())}},
+        }
+    )
+
+
+@app.custom_route("/api/capabilities", methods=["GET"])
+async def api_capabilities(request: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "server": "onenote-mcp",
+            "version": _SERVER_VERSION,
+            "features": {
+                "notebooks": True,
+                "sections": True,
+                "pages": True,
+                "search": True,
+                "toc": True,
+                "auth": True,
+                "chat": False,
+                "skills": False,
+            },
+            "tools": [t["name"] for t in _list_mcp_tools()],
+        }
+    )
+
+
+@app.custom_route("/api/skills", methods=["GET"])
+async def api_skills(request: Request) -> JSONResponse:
+    return JSONResponse({"skills": _TAGGED_SKILLS})
+
+
+@app.custom_route("/api/llm/discover", methods=["GET"])
+async def api_llm_discover(request: Request) -> JSONResponse:
+    ollama_detected = False
+    configured_model = ""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get("http://127.0.0.1:11434/api/tags")
+            if r.status_code == 200:
+                ollama_detected = True
+                models = r.json().get("models", [])
+                if models:
+                    configured_model = models[0].get("name", "")
+    except Exception:
+        pass
+    return JSONResponse(
+        {
+            "ollama_detected": ollama_detected,
+            "configured_model": configured_model,
+            "providers": {"ollama": {"detected": ollama_detected, "port": 11434}},
+        }
+    )
+
+
+@app.custom_route("/api/v1/diagnostics", methods=["GET"])
+async def api_diagnostics(request: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "status": "ok",
+            "server": "onenote-mcp",
+            "version": _SERVER_VERSION,
+            "uptime_seconds": int(time.monotonic() - _START_TIME),
+            "tool_count": _tool_count(),
+            "tools": [{"name": t["name"]} for t in _list_mcp_tools()],
+            "system": {"windows": sys.platform == "win32"},
+            "errors": [],
+        }
+    )
+
+
+@app.custom_route("/api/shutdown", methods=["POST"])
+async def api_shutdown(request: Request) -> JSONResponse:
+    """Graceful shutdown - agent-requested termination."""
+    logger.warning("Shutdown requested via /api/shutdown")
+
+    async def _terminate():
+        await asyncio.sleep(0.5)
+        os._exit(0)
+
+    _shutdown_tasks.append(asyncio.create_task(_terminate()))
+    return JSONResponse({"success": True, "message": "Server shutting down..."})
+
+
 # ---- Webapp activity log (ring buffer) ----
 
 from .activity_log import ActivityLog
@@ -384,6 +524,7 @@ async def api_auth_status(request: Request) -> JSONResponse:
 
 
 def _error_response(exc: Exception) -> JSONResponse:
+    logger.exception("API error: %s", exc)
     return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
 
 
@@ -474,14 +615,18 @@ async def authenticate() -> str:
 
 
 @app.tool()
-async def saveAccessToken(token: str) -> str:
-    """Save an access token for later use.
+async def onenote_save_access_token(
+    token: Annotated[str, Field(description="The Microsoft Graph access token to save")],
+) -> str:
+    """Save a Microsoft Graph access token for later use.
 
-    Args:
-        token: The Microsoft Graph access token to save
+    Persists the token to the local token file so subsequent tools can call the Graph API.
 
-    Returns:
-        Confirmation message
+    ## Return Format
+    A confirmation string: "✅ Access token saved successfully" or "❌ ..." on failure.
+
+    ## Examples
+    save_access_token(token="eyJhbGciOi...")  # paste a token from az login / Graph explorer
     """
     try:
         save_access_token(token)
@@ -491,11 +636,14 @@ async def saveAccessToken(token: str) -> str:
 
 
 @app.tool()
-async def listNotebooks() -> str:
-    """Get a list of all your OneNote notebooks.
+async def onenote_list_notebooks() -> str:
+    """List all Microsoft OneNote notebooks accessible to the signed-in account.
 
-    Returns:
-        Formatted list of notebooks with IDs and display names
+    ## Return Format
+    Markdown string: "📓 Your OneNote Notebooks:" followed by numbered notebooks with ID.
+
+    ## Examples
+    list_notebooks()
     """
     try:
         notebooks = await list_notebooks()
@@ -513,14 +661,16 @@ async def listNotebooks() -> str:
 
 
 @app.tool()
-async def getNotebook(notebook_id: str) -> str:
-    """Get details of a specific notebook.
+async def onenote_get_notebook(
+    notebook_id: Annotated[str, Field(description="The ID of the notebook to retrieve")],
+) -> str:
+    """Get details of a specific OneNote notebook.
 
-    Args:
-        notebook_id: The ID of the notebook to retrieve
+    ## Return Format
+    Markdown string with notebook name, ID, sections URL, and section groups URL.
 
-    Returns:
-        Detailed notebook information
+    ## Examples
+    get_notebook(notebook_id="0-ABC123...")
     """
     try:
         notebook = await get_notebook(notebook_id)
@@ -536,14 +686,14 @@ async def getNotebook(notebook_id: str) -> str:
 
 
 @app.tool()
-async def listSections(notebook_id: str) -> str:
-    """List all sections in a notebook.
+async def onenote_list_sections(notebook_id: Annotated[str, Field(description="The ID of the notebook")]) -> str:
+    """List all sections in a OneNote notebook.
 
-    Args:
-        notebook_id: The ID of the notebook
+    ## Return Format
+    Markdown string: "📂 Sections in notebook:" with numbered sections and their page URLs.
 
-    Returns:
-        Formatted list of sections in the notebook
+    ## Examples
+    list_sections(notebook_id="0-ABC123...")
     """
     try:
         sections = await list_sections(notebook_id)
@@ -562,14 +712,14 @@ async def listSections(notebook_id: str) -> str:
 
 
 @app.tool()
-async def listPages(section_id: str) -> str:
-    """List all pages in a section.
+async def onenote_list_pages(section_id: Annotated[str, Field(description="The ID of the section")]) -> str:
+    """List all pages in a OneNote section.
 
-    Args:
-        section_id: The ID of the section
+    ## Return Format
+    Markdown string: "📄 Pages in section:" with numbered pages, created and modified dates.
 
-    Returns:
-        Formatted list of pages in the section
+    ## Examples
+    list_pages(section_id="0-SEC123...")
     """
     try:
         pages = await list_pages(section_id)
@@ -589,17 +739,16 @@ async def listPages(section_id: str) -> str:
 
 
 @app.tool()
-async def getPage(page_id: str) -> str:
-    """Get the complete content of a specific page.
+async def onenote_get_page(page_id: Annotated[str, Field(description="The ID of the page to retrieve")]) -> str:
+    """Get the complete HTML content of a OneNote page.
 
-    This tool retrieves the full HTML content of a OneNote page,
-    including all text, formatting, and embedded elements.
+    Retrieves the full page content including text, formatting, and embedded elements.
 
-    Args:
-        page_id: The ID of the page to retrieve
+    ## Return Format
+    Markdown string: "📄 Page Content:" with title, ID, timestamps, and the raw HTML body.
 
-    Returns:
-        Complete page content as HTML/markdown
+    ## Examples
+    get_page(page_id="0-PG123...")
     """
     try:
         page = await get_page(page_id)
@@ -632,16 +781,18 @@ async def getPage(page_id: str) -> str:
 
 
 @app.tool()
-async def createPage(notebook_id: str, title: str, content: str = "") -> str:
-    """Create a new page in a notebook.
+async def onenote_create_page(
+    notebook_id: Annotated[str, Field(description="The ID of the notebook to create the page in")],
+    title: Annotated[str, Field(description="The title of the new page")],
+    content: Annotated[str, Field(description="Optional HTML content for the page")] = "",
+) -> str:
+    """Create a new page in a OneNote notebook.
 
-    Args:
-        notebook_id: The ID of the notebook to create the page in
-        title: The title of the new page
-        content: Optional HTML content for the page
+    ## Return Format
+    Confirmation string: "✅ Page '<title>' created successfully with ID: `<id>`".
 
-    Returns:
-        Confirmation of page creation
+    ## Examples
+    create_page(notebook_id="0-ABC123...", title="Meeting Notes", content="<h1>Notes</h1><p>...</p>")
     """
     try:
         result = await create_page(notebook_id, title, content)
@@ -652,14 +803,14 @@ async def createPage(notebook_id: str, title: str, content: str = "") -> str:
 
 
 @app.tool()
-async def searchPages(query: str) -> str:
-    """Search for pages across all notebooks.
+async def onenote_search_pages(query: Annotated[str, Field(description="Search query string")]) -> str:
+    """Search for pages across all OneNote notebooks.
 
-    Args:
-        query: Search query string
+    ## Return Format
+    Markdown string: "🔍 Search Results for '<query>':" with numbered matching pages.
 
-    Returns:
-        List of matching pages
+    ## Examples
+    search_pages(query="quarterly report")
     """
     try:
         pages = await search_pages(query)
@@ -679,17 +830,16 @@ async def searchPages(query: str) -> str:
 
 
 @app.tool()
-async def getNotebookTOC(notebook_id: str) -> str:
-    """Generate a table of contents for a notebook.
+async def onenote_get_notebook_toc(notebook_id: Annotated[str, Field(description="The ID of the notebook")]) -> str:
+    """Generate a table of contents for a OneNote notebook.
 
-    This tool creates a comprehensive overview of all sections and pages
-    in a notebook, useful for navigation and understanding structure.
+    Creates a comprehensive overview of all sections and pages, useful for navigation.
 
-    Args:
-        notebook_id: The ID of the notebook
+    ## Return Format
+    Markdown string: "📚 Table of Contents: <notebook>" with stats and per-section page lists.
 
-    Returns:
-        Formatted table of contents
+    ## Examples
+    get_notebook_toc(notebook_id="0-ABC123...")
     """
     try:
         toc = await get_notebook_toc(notebook_id)
@@ -712,6 +862,69 @@ async def getNotebookTOC(notebook_id: str) -> str:
         return result
     except Exception as e:
         return f"❌ Failed to generate TOC: {e!s}"
+
+
+@app.tool()
+async def shutdown_server() -> str:
+    """Shut down the onenote-mcp server gracefully.
+
+    Use when the user or an agent explicitly asks to stop the server process.
+
+    ## Return Format
+    Confirmation string: "✅ Server shutting down...".
+
+    ## Examples
+    shutdown_server()
+    """
+    logger.warning("Shutdown requested via MCP tool")
+
+    async def _terminate():
+        await asyncio.sleep(0.5)
+        os._exit(0)
+
+    _shutdown_tasks.append(asyncio.create_task(_terminate()))
+    return "✅ Server shutting down..."
+
+
+@app.tool()
+async def onenote_help() -> str:
+    """List the available OneNote MCP tools and when to use each.
+
+    ## Return Format
+    Markdown string enumerating the 11 tools with one-line usage notes.
+
+    ## Examples
+    onenote_help()
+    """
+    return """📚 **OneNote MCP tools:**
+- `authenticate` - start Microsoft device-code login
+- `save_access_token` - store a Graph token manually
+- `list_notebooks` - all notebooks
+- `get_notebook` - notebook details
+- `list_sections` - sections of a notebook
+- `list_pages` - pages of a section
+- `get_page` - full HTML content of a page
+- `create_page` - add a page with HTML body
+- `search_pages` - full-text search across notebooks
+- `get_notebook_toc` - sections + pages overview
+- `shutdown_server` - stop the server"""
+
+
+# ASGI app for uvicorn (fleet standard: serve mcp.http_app(), never the raw FastMCP object)
+http_app = CORSMiddleware(
+    app.http_app(),
+    allow_origins=[
+        "http://localhost:10906",
+        "http://127.0.0.1:10906",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+        "tauri://localhost",
+    ],
+    allow_origin_regex=r"https?://(?:[a-zA-Z0-9-]+\.ts\.net|.*?\.tail-[a-f0-9]+\.ts\.net|tauri\.localhost|localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?$|^tauri://localhost$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def main():

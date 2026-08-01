@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "text",
+            "text": "## Session Context (OneNote MCP)\n\nYou have access to Microsoft OneNote via Microsoft Graph (12 tools).\n\n**Before starting work:**\n1. Find the notebook: onenote_list_notebooks()\n2. Get structure: onenote_get_notebook_toc(notebook_id=\"...\")\n\n**At end of work, save insights:**\n- Persist notes: onenote_create_page(notebook_id=..., title=..., content=\"<html>\")\n- If auth fails, run: authenticate()"
+          }
+        ]
+      }
+    ]
+  }
+}

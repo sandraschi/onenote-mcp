@@ -8,7 +8,7 @@
     WebRoot      = 'D:\Dev\repos\onenote-mcp\web_sota'
     Backend = @{
         Kind          = 'uvicorn'
-        UvicornTarget = 'onenote_mcp.server:app'
+        UvicornTarget = 'onenote_mcp.server:http_app'
         SyncExtras    = @('dev')
         Env           = @{ WEB_PORT = '10907' }
     }

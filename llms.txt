@@ -1,0 +1,9 @@
+# onenote-mcp
+
+FastMCP 3.4 server for Microsoft OneNote via the Graph API: notebook/section/page browsing,
+page creation, full-text search, and TOC generation. HTTP (Streamable) + stdio dual transport,
+Tauri/NSIS desktop wrapper, and a Vite React webapp (dashboard, notebooks browser, chat, logging).
+
+- Full reference: [llms-full.txt](llms-full.txt)
+- Ports: backend 10907 (`/mcp`, `/api/*`), webapp 10906 (Vite dev)
+- Auth: Microsoft device-code flow (`authenticate` tool or Settings page)

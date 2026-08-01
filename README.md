@@ -172,7 +172,7 @@ This will start the MCP server, and you'll see a message:
 ```
 Server started successfully.
 Use the "authenticate" tool to start the authentication flow,
-or use "saveAccessToken" if you already have a token.
+or use "onenote_save_access_token" if you already have a token.
 ```
 
 ### Step 4: Authenticate Through Your AI Assistant
@@ -199,14 +199,14 @@ Once authenticated, the following tools are available for AI assistants to use:
 | Tool Name | Description |
 |-----------|-------------|
 | `authenticate` | Start the Microsoft authentication flow |
-| `listNotebooks` | Get a list of all your OneNote notebooks |
-| `getNotebook` | Get details of a specific notebook |
-| `listSections` | List all sections in a notebook |
-| `listPages` | List all pages in a section |
-| `getPage` | Get the complete content of a specific page, including HTML formatting |
-| `createPage` | Create a new page with HTML content |
-| `searchPages` | Search for pages across your notebooks |
-| `getNotebookTOC` | Generate a Table of Contents for a notebook (all sections & pages) |
+| `onenote_list_notebooks` | Get a list of all your OneNote notebooks |
+| `onenote_get_notebook` | Get details of a specific notebook |
+| `onenote_list_sections` | List all sections in a notebook |
+| `onenote_list_pages` | List all pages in a section |
+| `onenote_get_page` | Get the complete content of a specific page, including HTML formatting |
+| `onenote_create_page` | Create a new page with HTML content |
+| `onenote_search_pages` | Search for pages across your notebooks |
+| `onenote_get_notebookTOC` | Generate a Table of Contents for a notebook (all sections & pages) |
 
 ## Example Interactions
 
@@ -214,22 +214,22 @@ Here are some examples of how you can interact with the OneNote MCP through your
 
 ```
 User: Can you show me my OneNote notebooks?
-AI: (uses listNotebooks) I found 3 notebooks: "Work", "Personal", and "Projects"
+AI: (uses onenote_list_notebooks) I found 3 notebooks: "Work", "Personal", and "Projects"
 
 User: What sections are in my Projects notebook?
-AI: (uses listSections) Your Projects notebook has the following sections: "Active Projects", "Ideas", and "Completed"
+AI: (uses onenote_list_sections) Your Projects notebook has the following sections: "Active Projects", "Ideas", and "Completed"
 
 User: Create a new page in Projects with today's date as the title
-AI: (uses createPage) I've created a new page titled "2025-04-12" in your Projects notebook
+AI: (uses onenote_create_page) I've created a new page titled "2025-04-12" in your Projects notebook
 
 User: Find all my notes about machine learning
-AI: (uses searchPages) I found 5 pages with content related to machine learning...
+AI: (uses onenote_search_pages) I found 5 pages with content related to machine learning...
 
 User: Can you read and summarize my notes on the "Project Requirements" page?
-AI: (uses getPage) Based on your "Project Requirements" page, here's a summary: The project requires Python 3.8+, integration with AWS services, and completion by Q3. Key deliverables include a web dashboard, API, and documentation...
+AI: (uses onenote_get_page) Based on your "Project Requirements" page, here's a summary: The project requires Python 3.8+, integration with AWS services, and completion by Q3. Key deliverables include a web dashboard, API, and documentation...
 
 User: Extract all the action items from my "Team Meeting" notes
-AI: (uses getPage) Here are all the action items from your "Team Meeting" notes:
+AI: (uses onenote_get_page) Here are all the action items from your "Team Meeting" notes:
 1. John to complete API documentation by Friday
 2. Sarah to schedule design review meeting
 3. Team to finalize Q3 roadmap by end of month
@@ -245,7 +245,7 @@ User: I want to read through all my OneNote pages so I can ask questions about t
 AI: (runs read-all-pages.js) I've retrieved the full content of all your pages in a readable format. Now you can ask me specific questions about any of the content.
 
 User: Generate a table of contents for my Projects notebook
-AI: (uses getNotebookTOC) Here's the TOC for your Projects notebook:
+AI: (uses onenote_get_notebookTOC) Here's the TOC for your Projects notebook:
 
 # Projects
 > 3 sections, 12 pages
@@ -257,7 +257,7 @@ AI: (uses getNotebookTOC) Here's the TOC for your Projects notebook:
 ...
 
 User: Show me a TOC of all my notebooks
-AI: (uses listNotebooks, then getNotebookTOC for each) Here are all your notebooks with their structure...
+AI: (uses onenote_list_notebooks, then onenote_get_notebookTOC for each) Here are all your notebooks with their structure...
 ```
 
 ## Advanced: Direct Script Usage

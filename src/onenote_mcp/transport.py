@@ -217,7 +217,28 @@ async def run_server_async(mcp_app, args: argparse.Namespace | None = None, serv
             path = config["path"]
             endpoint = f"http://{host}:{port}{path}"
             logger.info(f"Running in HTTP Streamable mode: {endpoint}")
-            await mcp_app.run_http_async(host=host, port=port, path=path)
+            # Fleet standard (CORS_STANDARD.md): serve mcp.http_app() via uvicorn.Server.
+            # run_http_async() drops custom CORSMiddleware and passes the wrong ASGI app.
+            import uvicorn
+            from starlette.middleware.cors import CORSMiddleware
+
+            cors = CORSMiddleware(
+                mcp_app.http_app(path=path),
+                allow_origins=[
+                    f"http://{host}:{port}",
+                    "http://tauri.localhost",
+                    "https://tauri.localhost",
+                    "tauri://localhost",
+                ],
+                allow_origin_regex=r"https?://(?:[a-zA-Z0-9-]+\.ts\.net|.*?\.tail-[a-f0-9]+\.ts\.net|tauri\.localhost|localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?$|^tauri://localhost$",
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
+            server = uvicorn.Server(
+                uvicorn.Config(cors, host=host, port=port, log_level=config.get("log_level", "info"))
+            )
+            await server.serve()
 
         elif transport == "sse":
             host = config["host"]

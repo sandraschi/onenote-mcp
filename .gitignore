@@ -2,11 +2,28 @@
 node_modules/
 jspm_packages/
 
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
 # Build outputs
 dist/
 build/
 out/
 *.tsbuildinfo
+*.mcpb
+native/target/
+native/gen/
+mcpb/src/
+
+# Backups (batch-edit safety)
+*.bak
+*.bak.*
+
+# Audit reports
+reports/
 
 # Environment variables and secrets
 .env
@@ -58,3 +75,5 @@ Thumbs.db
 target/
 
 _dashboard/
+reports/
+web_sota/test-results/

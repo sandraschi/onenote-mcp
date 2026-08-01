@@ -1,0 +1,73 @@
+# onenote-mcp — Full LLM Reference
+
+FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual transport
+(stdio + HTTP Streamable), Tauri/NSIS desktop wrapper, Vite React webapp.
+
+## Quick facts
+
+- Backend port: 10907 (REST `/api/*` + MCP `/mcp`)
+- Webapp port: 10906 (Vite dev, proxies `/api` -> 10907)
+- Auth: Microsoft device-code flow; token persisted to repo-root token file
+- Repo layout: `src/onenote_mcp/` (server, transport, models, activity log), `web_sota/` (React), `native/` (Tauri)
+
+## Environment variables
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `GRAPH_ACCESS_TOKEN` | - | Microsoft Graph bearer token (fallback for the token file) |
+| `MCP_TRANSPORT` | stdio | `stdio` / `http` / `sse` |
+| `ONENOTE_HOST` | 127.0.0.1 | HTTP bind host |
+| `ONENOTE_PORT` | 10907 | HTTP bind port |
+| `ONENOTE_LOG_LEVEL` | info | uvicorn log level |
+| `MCP_BRIDGE_URLS` | - | Comma-separated remote MCP URLs proxied via create_proxy |
+
+## MCP tools (12)
+
+| Tool | Purpose |
+|------|---------|
+| `authenticate` | Start Microsoft device-code login flow |
+| `onenote_save_access_token` | Persist a Graph token manually |
+| `onenote_list_notebooks` | List all notebooks |
+| `onenote_get_notebook` | Notebook details (name, URLs) |
+| `onenote_list_sections` | Sections of a notebook |
+| `onenote_list_pages` | Pages of a section |
+| `onenote_get_page` | Full HTML content of a page |
+| `onenote_create_page` | Create a page with HTML body |
+| `onenote_search_pages` | Full-text search across notebooks |
+| `onenote_get_notebook_toc` | Sections + pages overview |
+| `onenote_help` | Tool list and usage notes |
+| `shutdown_server` | Graceful server termination |
+
+## REST API (webapp surface)
+
+- `GET /health` — liveness probe
+- `GET /api/status` — version, uptime, tool count, Graph auth state
+- `GET /api/capabilities` — feature flags + tool names
+- `GET /api/v1/diagnostics` — tool list, system info (CUA-NSIS smoke)
+- `GET /api/logs`, `DELETE /api/logs`, `GET /api/logs/stats`, `GET /api/logs/export` — activity ring buffer
+- `POST /api/auth/device`, `GET /api/auth/poll`, `GET /api/auth/status` — device-code auth UI
+- `GET /api/notebooks`, `GET /api/notebooks/{id}/toc` — notebook browser
+- `GET /api/pages/{id}`, `POST /api/pages`, `GET /api/search?q=` — page content/creation/search
+- `GET /api/skills` — skills list (empty until skills ship)
+- `GET /api/llm/discover` — Ollama detection (`ollama_detected`, `configured_model`)
+- `POST /api/shutdown` — graceful shutdown (agent-requested)
+
+## Architecture
+
+`server.py` builds the FastMCP app with `custom_route` REST endpoints and registers tools.
+The module exposes `http_app` (CORS-wrapped `app.http_app()`) as the uvicorn ASGI target —
+never the raw FastMCP object. `transport.py` serves stdio/http/sse from the CLI. `run_server.py`
+is the PyInstaller entry: FastAPI shell with CORS + `/mcp` mount. `native/` bundles the backend
+exe as a Tauri resource (`.env.example` template only, never `.env`).
+
+## Webapp pages
+
+Dashboard (live KPIs), Notebooks (tree browser + page viewer + search + create), Tools, Status,
+Apps, Chat (personality selector, localStorage history), Logging (ring buffer viewer), Help, Settings (auth + LLM provider).
+
+## Troubleshooting
+
+- `TypeError: 'FastMCP' object is not callable` — uvicorn was pointed at `server:app`;
+  use `onenote_mcp.server:http_app`.
+- Chat shows Ollama offline — start Ollama (port 11434) or check `/api/llm/discover`.
+- Graph 401 — run `authenticate` again (token expired).

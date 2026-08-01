@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import _strptime  # noqa: F401 -- PyInstaller must bundle this eagerly
 import os
 import sys
 from pathlib import Path
@@ -17,11 +16,28 @@ if str(base / "src") not in sys.path:
 os.environ.setdefault("MCP_TRANSPORT", "http")
 
 if __name__ == "__main__":
+    import uvicorn
     from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
     from onenote_mcp.server import app as _mcp
 
     app = FastAPI(title="onenote-mcp")
-    app.mount("/mcp", _mcp.http_app(path="/"))
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:10906",
+            "http://127.0.0.1:10906",
+            "http://tauri.localhost",
+            "https://tauri.localhost",
+            "tauri://localhost",
+        ],
+        allow_origin_regex=r"https?://(?:[a-zA-Z0-9-]+\.ts\.net|.*?\.tail-[a-f0-9]+\.ts\.net|tauri\.localhost|localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?$|^tauri://localhost$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.mount("/mcp", _mcp.http_app())
 
     host = os.environ.get("ONENOTE_HOST", "127.0.0.1")
     port = int(os.environ.get("ONENOTE_PORT", os.environ.get("MCP_PORT", "10907")))

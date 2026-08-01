@@ -54,10 +54,10 @@ dev = [
 onenote-mcp = "onenote_mcp.server:main"
 
 [project.urls]
-Homepage = "https://github.com/YOUR_USERNAME/onenote-mcp"
-Repository = "https://github.com/YOUR_USERNAME/onenote-mcp"
-Documentation = "https://github.com/YOUR_USERNAME/onenote-mcp#readme"
-Issues = "https://github.com/YOUR_USERNAME/onenote-mcp/issues"
+Homepage = "https://github.com/sandraschi/onenote-mcp"
+Repository = "https://github.com/sandraschi/onenote-mcp"
+Documentation = "https://github.com/sandraschi/onenote-mcp#readme"
+Issues = "https://github.com/sandraschi/onenote-mcp/issues"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,0 +1,6 @@
+{
+  "name": "onenote-mcp",
+  "version": "1.0.0",
+  "description": "Microsoft OneNote MCP server - session start tool awareness",
+  "hooks": "../hooks/hooks.json"
+}

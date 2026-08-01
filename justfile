@@ -43,5 +43,42 @@ audit-deps:
     Set-Location '{{justfile_directory()}}'
     uv run safety check
 
+# Run the MCP server in HTTP mode (fleet launcher reads fleet-start.config.ps1)
+serve:
+    Set-Location '{{justfile_directory()}}'
+    uv run python -m onenote_mcp --http
+
+# Run the test suite
+test:
+    Set-Location '{{justfile_directory()}}'
+    uv run pytest tests/ -q
+
+# Format and lint (fix pass)
+fmt:
+    Set-Location '{{justfile_directory()}}'
+    uv run ruff format .
+    uv run ruff check . --fix
+
+# Playwright e2e (webapp)
+e2e:
+    Set-Location '{{justfile_directory()}}\web_sota'
+    npx playwright test
+
+# Build the Tauri NSIS desktop installer
+build-native:
+    Set-Location '{{justfile_directory()}}\native'
+    $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+    .\build.ps1
+
+# All gates green: lint + format + tests + tsc + biome
+gates-green:
+    Set-Location '{{justfile_directory()}}'
+    uv run ruff check src/ tests/
+    uv run ruff format src/ tests/ --check
+    uv run pytest tests/ -q
+    Set-Location '{{justfile_directory()}}\web_sota'
+    npx tsc -b
+    npx @biomejs/biome ci .
+
 
 # Bootstrap: install dev deps + pre-commit hook

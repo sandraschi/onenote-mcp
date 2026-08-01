@@ -67,15 +67,15 @@ Copy-Item $src "$ResourceDir\${RepoName}-backend.exe" -Force
 Copy-Item $src "$DevDir\${RepoName}-backend-$Triple.exe" -Force
 Write-Host "  Backend exe: $((Get-Item $src).Length / 1MB) MB"
 
-# Bundle .env into installer if it exists (survives reinstall, no manual copy needed)
-$envSrc = "$Root\.env"
+# Bundle .env.example (NOT .env - .env contains personal API keys, never ship it)
+$envSrc = "$Root\.env.example"
 if (Test-Path $envSrc) {
-    Copy-Item $envSrc "$ResourceDir\.env" -Force
-    Write-Host "  Bundled .env ($((Get-Item $envSrc).Length) bytes)" -ForegroundColor Green
+    Copy-Item $envSrc "$ResourceDir\.env.example" -Force
+    Write-Host "  Bundled .env.example (template only, no secrets)" -ForegroundColor Green
 } else {
-    Write-Host "  WARNING: No .env at repo root - create one from .env.example for credentials" -ForegroundColor DarkYellow
-    Set-Content -Path "$ResourceDir\.env" -Value "# Empty - configure via Settings page" -Encoding utf8
-} -ForegroundColor Green
+    Write-Host "  WARNING: .env.example not found at repo root - create one for the first-run setup dialog" -ForegroundColor DarkYellow
+    Set-Content -Path "$ResourceDir\.env.example" -Value "# Copy to .env and fill in your credentials" -Encoding utf8
+}
 
 # Step 4: Single NSIS installer
 Write-Host "-> [4/4] Tauri NSIS bundle..." -ForegroundColor Yellow

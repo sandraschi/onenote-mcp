@@ -507,7 +507,6 @@ export function Notebooks() {
               <div
                 data-testid="page-content"
                 className="p-4 overflow-y-auto prose-invert onenote-content"
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: page HTML is DOMPurify-sanitized
                 dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
               />
             </div>
