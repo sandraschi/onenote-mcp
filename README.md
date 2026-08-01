@@ -65,7 +65,7 @@ All of this happens directly through the AI interface without you having to swit
      }
    }
    ```
-   
+
 4. Restart Cursor
 5. In Cursor, you can now interact with your OneNote data using natural language:
 
@@ -98,7 +98,7 @@ The first time you ask about OneNote, the AI will guide you through the authenti
      }
    }
    ```
-   
+
 4. You can now ask Claude to interact with your OneNote data
 
 ## Features

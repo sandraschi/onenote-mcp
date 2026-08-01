@@ -45,3 +45,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+.onenote-content { color: rgb(203 213 225); font-size: 0.875rem; line-height: 1.6; }
+.onenote-content h1, .onenote-content h2, .onenote-content h3 { color: white; margin: 0.75em 0 0.4em; }
+.onenote-content p { margin: 0.5em 0; }
+.onenote-content a { color: rgb(96 165 250); text-decoration: underline; }
+.onenote-content img { max-width: 100%; border-radius: 0.25rem; }
+.onenote-content table { border-collapse: collapse; width: 100%; }
+.onenote-content td, .onenote-content th { border: 1px solid rgb(51 65 85); padding: 0.35rem 0.5rem; }
+.onenote-content pre, .onenote-content code { background: rgb(15 23 42); border-radius: 0.25rem; padding: 0.1rem 0.3rem; }
+.onenote-content ul, .onenote-content ol { padding-left: 1.25rem; margin: 0.5em 0; }

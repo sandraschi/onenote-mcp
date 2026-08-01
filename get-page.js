@@ -46,68 +46,68 @@ async function getPageContent() {
       console.error('No access token found');
       return;
     }
-    
+
     // Initialize Graph client
     const client = Client.init({
       authProvider: (done) => {
         done(null, accessToken);
       }
     });
-    
+
     // Get all pages
     console.log(`Searching for page with title: "${pageTitle}"...`);
     const pagesResponse = await client.api('/me/onenote/pages').get();
-    
+
     if (!pagesResponse.value || pagesResponse.value.length === 0) {
       console.error('No pages found');
       return;
     }
-    
+
     // Find the requested page
-    const page = pagesResponse.value.find(p => 
+    const page = pagesResponse.value.find(p =>
       p.title && p.title.toLowerCase().includes(pageTitle.toLowerCase())
     );
-    
+
     if (!page) {
       console.error(`No page found with title containing "${pageTitle}"`);
       console.log('Available pages:');
       pagesResponse.value.forEach(p => console.log(`- ${p.title}`));
       return;
     }
-    
+
     console.log(`Found page: "${page.title}" (ID: ${page.id})`);
-    
+
     // Fetch the content
     const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${page.id}/content`;
     console.log(`Fetching content from: ${url}`);
-    
+
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status} ${response.statusText}`);
     }
-    
+
     const content = await response.text();
     console.log(`Content received! Length: ${content.length} characters`);
-    
+
     // Extract text content
     let plainText = content
       .replace(/<[^>]*>?/gm, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    
+
     console.log('\n--- PAGE CONTENT ---\n');
     console.log(plainText);
     console.log('\n--- END OF CONTENT ---\n');
-    
+
   } catch (error) {
     console.error('Error:', error);
   }
 }
 
 // Run the function
-getPageContent(); 
+getPageContent();

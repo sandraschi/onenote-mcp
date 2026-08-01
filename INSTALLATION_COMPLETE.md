@@ -103,4 +103,3 @@ Search for notes about "machine learning"
 
 **Installation Date**: 2025-12-21
 **Status**: Ready to use (FastMCP 2.13+ implementation)
-

@@ -1,4 +1,4 @@
-import { Activity, Cloud, FileText, HardDrive, Shield } from "lucide-react";
+import { Cloud, FileText, HardDrive, Shield } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function Status() {

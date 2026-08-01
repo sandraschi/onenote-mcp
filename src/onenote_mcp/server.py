@@ -1,10 +1,9 @@
 """FastMCP server for Microsoft OneNote integration."""
 
-import asyncio
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 import msal
@@ -21,11 +20,11 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 TOKEN_FILE_PATH = PROJECT_ROOT / TOKEN_FILE_NAME
 
 # Global state
-_access_token: Optional[str] = None
-_graph_client: Optional[httpx.AsyncClient] = None
+_access_token: str | None = None
+_graph_client: httpx.AsyncClient | None = None
 
 
-def load_access_token() -> Optional[str]:
+def load_access_token() -> str | None:
     """Load access token from file or environment variable."""
     global _access_token
     if _access_token:
@@ -80,11 +79,9 @@ async def get_graph_client() -> httpx.AsyncClient:
     return _graph_client
 
 
-async def authenticate_device_code() -> Dict[str, Any]:
+async def authenticate_device_code() -> dict[str, Any]:
     """Start device code authentication flow."""
-    app = msal.PublicClientApplication(
-        CLIENT_ID, authority="https://login.microsoftonline.com/common"
-    )
+    app = msal.PublicClientApplication(CLIENT_ID, authority="https://login.microsoftonline.com/common")
 
     # Get device code
     flow = app.initiate_device_flow(scopes=SCOPES)
@@ -107,7 +104,7 @@ async def authenticate_device_code() -> Dict[str, Any]:
         raise ValueError(f"Authentication failed: {error}")
 
 
-async def list_notebooks() -> List[Notebook]:
+async def list_notebooks() -> list[Notebook]:
     """List all OneNote notebooks."""
     client = await get_graph_client()
     response = await client.get("/me/onenote/notebooks")
@@ -126,7 +123,7 @@ async def get_notebook(notebook_id: str) -> Notebook:
     return Notebook(**response.json())
 
 
-async def list_sections(notebook_id: str) -> List[Section]:
+async def list_sections(notebook_id: str) -> list[Section]:
     """List all sections in a notebook."""
     client = await get_graph_client()
     response = await client.get(f"/me/onenote/notebooks/{notebook_id}/sections")
@@ -136,7 +133,7 @@ async def list_sections(notebook_id: str) -> List[Section]:
     return [Section(**section) for section in data.get("value", [])]
 
 
-async def list_pages(section_id: str) -> List[Page]:
+async def list_pages(section_id: str) -> list[Page]:
     """List all pages in a section."""
     client = await get_graph_client()
     response = await client.get(f"/me/onenote/sections/{section_id}/pages")
@@ -172,7 +169,7 @@ async def get_page(page_id: str) -> Page:
     )
 
 
-async def create_page(notebook_id: str, title: str, content: str) -> Dict[str, Any]:
+async def create_page(notebook_id: str, title: str, content: str) -> dict[str, Any]:
     """Create a new page with HTML content."""
     client = await get_graph_client()
 
@@ -200,7 +197,7 @@ async def create_page(notebook_id: str, title: str, content: str) -> Dict[str, A
     return response.json()
 
 
-async def search_pages(query: str) -> List[Page]:
+async def search_pages(query: str) -> list[Page]:
     """Search for pages across all notebooks."""
     client = await get_graph_client()
     response = await client.get(f"/me/onenote/pages?search={query}")
@@ -237,9 +234,7 @@ async def get_notebook_toc(notebook_id: str) -> TOCData:
             for page in pages
         ]
 
-        toc_sections.append(
-            TOCSection(name=section.displayName, pageCount=len(pages), pages=toc_pages)
-        )
+        toc_sections.append(TOCSection(name=section.displayName, pageCount=len(pages), pages=toc_pages))
 
     return TOCData(
         notebook=notebook.displayName,
@@ -249,14 +244,78 @@ async def get_notebook_toc(notebook_id: str) -> TOCData:
 
 
 # Create FastMCP app
-app = FastMCP(
-    name="onenote-mcp", instructions="Microsoft OneNote integration via Model Context Protocol"
-)
+app = FastMCP(name="onenote-mcp", instructions="Microsoft OneNote integration via Model Context Protocol")
 
 
 @app.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> JSONResponse:
     return JSONResponse({"status": "healthy", "server": "onenote-mcp"})
+
+
+# ---- REST API for the webapp (notebook/section/page browser) ----
+
+
+def _error_response(exc: Exception) -> JSONResponse:
+    return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
+
+
+@app.custom_route("/api/notebooks", methods=["GET"])
+async def api_list_notebooks(request: Request) -> JSONResponse:
+    try:
+        notebooks = await list_notebooks()
+        return JSONResponse({"success": True, "notebooks": [n.model_dump() for n in notebooks]})
+    except Exception as exc:
+        return _error_response(exc)
+
+
+@app.custom_route("/api/notebooks/{notebook_id}/toc", methods=["GET"])
+async def api_notebook_toc(request: Request) -> JSONResponse:
+    notebook_id = request.path_params["notebook_id"]
+    try:
+        toc = await get_notebook_toc(notebook_id)
+        return JSONResponse({"success": True, "toc": toc.model_dump()})
+    except Exception as exc:
+        return _error_response(exc)
+
+
+@app.custom_route("/api/pages/{page_id}", methods=["GET"])
+async def api_get_page(request: Request) -> JSONResponse:
+    page_id = request.path_params["page_id"]
+    try:
+        page = await get_page(page_id)
+        return JSONResponse({"success": True, "page": page.model_dump()})
+    except Exception as exc:
+        return _error_response(exc)
+
+
+@app.custom_route("/api/search", methods=["GET"])
+async def api_search_pages(request: Request) -> JSONResponse:
+    query = request.query_params.get("q", "")
+    if not query:
+        return JSONResponse({"success": False, "error": "q query param required"}, status_code=400)
+    try:
+        pages = await search_pages(query)
+        return JSONResponse({"success": True, "query": query, "pages": [p.model_dump() for p in pages]})
+    except Exception as exc:
+        return _error_response(exc)
+
+
+@app.custom_route("/api/pages", methods=["POST"])
+async def api_create_page(request: Request) -> JSONResponse:
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "invalid JSON body"}, status_code=400)
+    notebook_id = body.get("notebook_id", "")
+    title = body.get("title", "")
+    content = body.get("content", "")
+    if not notebook_id or not title:
+        return JSONResponse({"success": False, "error": "notebook_id and title are required"}, status_code=400)
+    try:
+        result = await create_page(notebook_id, title, content)
+        return JSONResponse({"success": True, "page": result})
+    except Exception as exc:
+        return _error_response(exc)
 
 
 # MCP Bridge — proxy remote MCP servers via ProxyProvider
@@ -283,7 +342,7 @@ async def authenticate() -> str:
         result = await authenticate_device_code()
         return f"✅ {result['message']}"
     except Exception as e:
-        return f"❌ Authentication failed: {str(e)}"
+        return f"❌ Authentication failed: {e!s}"
 
 
 @app.tool()
@@ -300,7 +359,7 @@ async def saveAccessToken(token: str) -> str:
         save_access_token(token)
         return "✅ Access token saved successfully"
     except Exception as e:
-        return f"❌ Failed to save token: {str(e)}"
+        return f"❌ Failed to save token: {e!s}"
 
 
 @app.tool()
@@ -322,7 +381,7 @@ async def listNotebooks() -> str:
 
         return result
     except Exception as e:
-        return f"❌ Failed to list notebooks: {str(e)}"
+        return f"❌ Failed to list notebooks: {e!s}"
 
 
 @app.tool()
@@ -345,7 +404,7 @@ async def getNotebook(notebook_id: str) -> str:
 **Section Groups URL:** {notebook.sectionGroupsUrl}
 """
     except Exception as e:
-        return f"❌ Failed to get notebook: {str(e)}"
+        return f"❌ Failed to get notebook: {e!s}"
 
 
 @app.tool()
@@ -363,7 +422,7 @@ async def listSections(notebook_id: str) -> str:
         if not sections:
             return "No sections found in this notebook"
 
-        result = f"📂 Sections in notebook:\n\n"
+        result = "📂 Sections in notebook:\n\n"
         for i, section in enumerate(sections, 1):
             result += f"{i}. **{section.displayName}**\n"
             result += f"   ID: `{section.id}`\n"
@@ -371,7 +430,7 @@ async def listSections(notebook_id: str) -> str:
 
         return result
     except Exception as e:
-        return f"❌ Failed to list sections: {str(e)}"
+        return f"❌ Failed to list sections: {e!s}"
 
 
 @app.tool()
@@ -389,7 +448,7 @@ async def listPages(section_id: str) -> str:
         if not pages:
             return "No pages found in this section"
 
-        result = f"📄 Pages in section:\n\n"
+        result = "📄 Pages in section:\n\n"
         for i, page in enumerate(pages, 1):
             result += f"{i}. **{page.title}**\n"
             result += f"   ID: `{page.id}`\n"
@@ -398,7 +457,7 @@ async def listPages(section_id: str) -> str:
 
         return result
     except Exception as e:
-        return f"❌ Failed to list pages: {str(e)}"
+        return f"❌ Failed to list pages: {e!s}"
 
 
 @app.tool()
@@ -441,7 +500,7 @@ async def getPage(page_id: str) -> str:
 *(Content not available)*
 """
     except Exception as e:
-        return f"❌ Failed to get page content: {str(e)}"
+        return f"❌ Failed to get page content: {e!s}"
 
 
 @app.tool()
@@ -461,7 +520,7 @@ async def createPage(notebook_id: str, title: str, content: str = "") -> str:
         page_id = result.get("id", "unknown")
         return f"✅ Page '{title}' created successfully with ID: `{page_id}`"
     except Exception as e:
-        return f"❌ Failed to create page: {str(e)}"
+        return f"❌ Failed to create page: {e!s}"
 
 
 @app.tool()
@@ -488,7 +547,7 @@ async def searchPages(query: str) -> str:
 
         return result
     except Exception as e:
-        return f"❌ Search failed: {str(e)}"
+        return f"❌ Search failed: {e!s}"
 
 
 @app.tool()
@@ -524,7 +583,7 @@ async def getNotebookTOC(notebook_id: str) -> str:
 
         return result
     except Exception as e:
-        return f"❌ Failed to generate TOC: {str(e)}"
+        return f"❌ Failed to generate TOC: {e!s}"
 
 
 def main():

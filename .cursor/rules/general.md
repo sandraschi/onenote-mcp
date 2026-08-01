@@ -32,4 +32,3 @@ This MCP server integrates with Microsoft OneNote:
 - Handle Microsoft Graph API authentication
 - Respect rate limits
 - Handle notebook/section/page hierarchy properly
-

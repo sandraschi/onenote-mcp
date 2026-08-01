@@ -1,9 +1,9 @@
 /**
  * Generate Table of Contents for a OneNote Notebook
- * 
+ *
  * Creates a hierarchical TOC showing all sections and pages
  * with optional metadata (created date, modified date, page count)
- * 
+ *
  * Usage: node get-notebook-toc.js [notebook-name] [--format=md|json|tree]
  */
 
@@ -22,7 +22,7 @@ function getAccessToken() {
 
 async function graphRequest(endpoint) {
     const token = getAccessToken();
-    
+
     return new Promise((resolve, reject) => {
         const options = {
             hostname: 'graph.microsoft.com',
@@ -109,7 +109,7 @@ async function buildNotebookTOC(notebook) {
 function formatAsMarkdown(toc) {
     const lines = [];
     const nb = toc.notebook;
-    
+
     lines.push(`# ${nb.name}`);
     lines.push('');
     lines.push(`> ${toc.stats.sectionCount} sections, ${toc.stats.pageCount} pages`);
@@ -121,7 +121,7 @@ function formatAsMarkdown(toc) {
     for (const section of nb.sections) {
         lines.push(`## ${section.name}`);
         lines.push('');
-        
+
         if (section.pages.length === 0) {
             lines.push('*(empty section)*');
         } else {
@@ -139,17 +139,17 @@ function formatAsMarkdown(toc) {
 function formatAsTree(toc) {
     const lines = [];
     const nb = toc.notebook;
-    
+
     lines.push(`${nb.name}/`);
-    
+
     const sectionCount = nb.sections.length;
     nb.sections.forEach((section, si) => {
         const isLastSection = si === sectionCount - 1;
         const sPrefix = isLastSection ? '└── ' : '├── ';
         const sIndent = isLastSection ? '    ' : '│   ';
-        
+
         lines.push(`${sPrefix}${section.name}/`);
-        
+
         const pageCount = section.pages.length;
         section.pages.forEach((page, pi) => {
             const isLastPage = pi === pageCount - 1;
@@ -160,7 +160,7 @@ function formatAsTree(toc) {
 
     lines.push('');
     lines.push(`(${toc.stats.sectionCount} sections, ${toc.stats.pageCount} pages)`);
-    
+
     return lines.join('\n');
 }
 
@@ -179,7 +179,7 @@ async function main() {
 
     try {
         const notebooks = await getNotebooks();
-        
+
         if (notebooks.length === 0) {
             console.log('No notebooks found.');
             return;
@@ -188,7 +188,7 @@ async function main() {
         // Find matching notebook or use first one
         let notebook;
         if (notebookName) {
-            notebook = notebooks.find(n => 
+            notebook = notebooks.find(n =>
                 n.displayName.toLowerCase().includes(notebookName.toLowerCase())
             );
             if (!notebook) {
@@ -230,4 +230,3 @@ async function main() {
 }
 
 main();
-

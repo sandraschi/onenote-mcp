@@ -1,5 +1,6 @@
 import {
   Activity,
+  BookOpen,
   Bot,
   ChevronLeft,
   ChevronRight,
@@ -23,6 +24,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const navItems = [
     { href: "/", label: "Overview", icon: LayoutDashboard },
+    { href: "/notebooks", label: "Notebooks", icon: BookOpen },
     { href: "/tools", label: "Tools", icon: Wrench },
     { href: "/status", label: "Status", icon: Activity },
     { href: "/apps", label: "App Hub", icon: Grid },

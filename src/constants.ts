@@ -11,30 +11,3 @@ export const CHARACTER_LIMIT = 25000;
 
 // Token file name
 export const TOKEN_FILE_NAME = '.access-token.txt';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

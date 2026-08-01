@@ -59,7 +59,3 @@ For Microsoft Graph integration tests, you need to:
 2. Use descriptive test function names starting with `test_`
 3. Mark Microsoft Graph-dependent tests with `@pytest.mark.microsoft_graph`
 4. Use fixtures from `conftest.py` for common test setup
-
-
-
-

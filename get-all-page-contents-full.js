@@ -39,49 +39,49 @@ async function getAllPagesFullContent() {
       console.error('No access token found');
       return;
     }
-    
+
     // Initialize Graph client
     const client = Client.init({
       authProvider: (done) => {
         done(null, accessToken);
       }
     });
-    
+
     // List pages
     console.log("Fetching all pages...");
     const pages = await client.api('/me/onenote/pages').get();
-    
+
     if (!pages || !pages.value || pages.value.length === 0) {
       console.log("No pages found");
       return;
     }
-    
+
     console.log(`Found ${pages.value.length} pages. Fetching full content for each...\n`);
-    
+
     // Process each page
     for (const page of pages.value) {
       console.log(`\n==================================================================`);
       console.log(`PAGE: ${page.title}`);
       console.log(`Last modified: ${new Date(page.lastModifiedDateTime).toLocaleString()}`);
       console.log(`==================================================================\n`);
-      
+
       try {
         // Create direct HTTP request to the content endpoint
         const url = page.contentUrl;
-        
+
         const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${accessToken}`
           }
         });
-        
+
         if (!response.ok) {
           console.error(`Error fetching ${page.title}: ${response.status} ${response.statusText}`);
           continue;
         }
-        
+
         const content = await response.text();
-        
+
         // Extract text content from HTML for easier reading
         console.log("FULL HTML CONTENT:");
         console.log(content);
@@ -90,11 +90,11 @@ async function getAllPagesFullContent() {
         console.error(`Error processing ${page.title}:`, error.message);
       }
     }
-    
+
   } catch (error) {
     console.error("Error:", error);
   }
 }
 
 // Run the function
-getAllPagesFullContent(); 
+getAllPagesFullContent();

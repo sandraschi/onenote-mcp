@@ -53,7 +53,7 @@ Thumbs.db
 .rpt2_cache/
 .rts2_cache_cjs/
 .rts2_cache_es/
-.rts2_cache_umd/ 
+.rts2_cache_umd/
 # Rust / Zed IDE — rust-analyzer may create target/ at repo root
 target/
 

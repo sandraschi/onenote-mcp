@@ -50,9 +50,9 @@ Error Handling:
       try {
         const client = await ensureGraphClient();
         const response = await client.api("/me/onenote/notebooks").get() as { value: Notebook[] };
-        
+
         let result = JSON.stringify(response.value, null, 2);
-        
+
         // Check character limit
         if (result.length > CHARACTER_LIMIT) {
           const truncated = response.value.slice(0, Math.max(1, Math.floor(response.value.length / 2)));
@@ -64,7 +64,7 @@ Error Handling:
             message: `Response truncated from ${response.value.length} to ${truncated.length} notebooks. Use filters or pagination to see more.`
           }, null, 2);
         }
-        
+
         return {
           content: [{
             type: "text",
@@ -118,10 +118,10 @@ Error Handling:
       try {
         const client = await ensureGraphClient();
         const response = await client.api(`/me/onenote/notebooks`).get() as { value: Notebook[] };
-        
+
         if (params.notebook_name) {
           const searchName = params.notebook_name.toLowerCase();
-          const notebook = response.value.find(n => 
+          const notebook = response.value.find(n =>
             n.displayName.toLowerCase().includes(searchName)
           );
           if (!notebook) {
@@ -192,17 +192,17 @@ Error Handling:
         const client = await ensureGraphClient();
         const notebooksResponse = await client.api('/me/onenote/notebooks').get() as { value: Notebook[] };
         const notebooks = notebooksResponse.value;
-        
+
         if (notebooks.length === 0) {
           return {
             content: [{ type: "text", text: "No notebooks found." }]
           };
         }
-        
+
         let notebook: Notebook;
         if (params.notebook_name) {
           const searchName = params.notebook_name.toLowerCase();
-          notebook = notebooks.find(n => 
+          notebook = notebooks.find(n =>
             n.displayName.toLowerCase().includes(searchName)
           )!;
           if (!notebook) {
@@ -212,18 +212,18 @@ Error Handling:
         } else {
           notebook = notebooks[0];
         }
-        
+
         const sectionsResponse = await client.api(`/me/onenote/notebooks/${notebook.id}/sections`).get() as { value: Array<{ id: string; displayName: string }> };
         const sections = sectionsResponse.value;
-        
+
         let totalPages = 0;
         const tocSections: TOCSection[] = [];
-        
+
         for (const section of sections) {
           const pagesResponse = await client.api(`/me/onenote/sections/${section.id}/pages`).get() as { value: Array<{ id: string; title: string; createdDateTime: string; lastModifiedDateTime: string }> };
           const pages = pagesResponse.value;
           totalPages += pages.length;
-          
+
           tocSections.push({
             name: section.displayName,
             pageCount: pages.length,
@@ -235,7 +235,7 @@ Error Handling:
             }))
           });
         }
-        
+
         // Format as markdown
         const lines: string[] = [];
         lines.push(`# ${notebook.displayName}`);
@@ -244,7 +244,7 @@ Error Handling:
         lines.push('');
         lines.push('---');
         lines.push('');
-        
+
         for (const section of tocSections) {
           lines.push(`## ${section.name} (${section.pageCount} pages)`);
           lines.push('');
@@ -258,23 +258,23 @@ Error Handling:
           }
           lines.push('');
         }
-        
+
         const tocData: TOCData = {
           notebook: notebook.displayName,
           stats: { sections: sections.length, pages: totalPages },
           sections: tocSections
         };
-        
+
         let markdownResult = lines.join('\n');
         let jsonResult = JSON.stringify(tocData, null, 2);
-        
+
         // Check character limit
         const combinedLength = markdownResult.length + jsonResult.length;
         if (combinedLength > CHARACTER_LIMIT) {
           // Truncate if needed
           const maxMarkdown = Math.floor(CHARACTER_LIMIT * 0.6);
           const maxJson = CHARACTER_LIMIT - maxMarkdown - 100; // Reserve space for truncation message
-          
+
           if (markdownResult.length > maxMarkdown) {
             markdownResult = markdownResult.substring(0, maxMarkdown) + '\n\n*(Content truncated due to size limits)*';
           }
@@ -286,7 +286,7 @@ Error Handling:
             }, null, 2).substring(0, maxJson);
           }
         }
-        
+
         return {
           content: [
             { type: "text", text: markdownResult },
@@ -300,30 +300,3 @@ Error Handling:
     }
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

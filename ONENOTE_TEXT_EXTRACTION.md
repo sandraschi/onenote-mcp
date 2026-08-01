@@ -37,29 +37,30 @@ from onenote_text_extractor import extract_readable_text
 
 mcp = FastMCP("office-365-mcp")
 
+
 @mcp.tool()
 async def get_onenote_page_text(page_id: str) -> str:
-    '''Get OneNote page content as readable text.
-    
+    """Get OneNote page content as readable text.
+
     Retrieves a OneNote page and converts the HTML content
     into clean, readable text that AI models can easily parse.
-    
+
     Args:
         page_id: The ID of the OneNote page to retrieve
-        
+
     Returns:
         Clean, readable text extracted from the page HTML
-        
+
     Examples:
         # Get readable text from a page
         text = await get_onenote_page_text("page-123")
-    '''
+    """
     # Your existing code to get HTML from OneNote
     html_content = await your_onenote_api_call(page_id)
-    
+
     # Convert HTML to readable text
     readable_text = extract_readable_text(html_content)
-    
+
     return readable_text
 ```
 
@@ -70,17 +71,17 @@ If you already have a tool that returns HTML:
 ```python
 @mcp.tool()
 async def get_onenote_page(page_id: str, format: str = "html") -> str:
-    '''Get OneNote page content.
-    
+    """Get OneNote page content.
+
     Args:
         page_id: The ID of the OneNote page
         format: Output format - "html" or "text" (default: "html")
-        
+
     Returns:
         Page content in requested format
-    '''
+    """
     html_content = await your_onenote_api_call(page_id)
-    
+
     if format == "text":
         return extract_readable_text(html_content)
     else:
@@ -186,4 +187,3 @@ This will run the example with sample HTML and show the output.
 - Preserves document hierarchy and formatting
 - Gracefully handles malformed HTML
 - Returns error message if extraction fails
-

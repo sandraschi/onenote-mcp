@@ -53,10 +53,10 @@ Error Handling:
       try {
         const client = await ensureGraphClient();
         let url = '/me/onenote/sections';
-        
+
         if (params.notebook_name) {
           const notebooksResponse = await client.api('/me/onenote/notebooks').get() as { value: Notebook[] };
-          const notebook = notebooksResponse.value.find(n => 
+          const notebook = notebooksResponse.value.find(n =>
             n.displayName.toLowerCase().includes(params.notebook_name!.toLowerCase())
           );
           if (!notebook) {
@@ -64,11 +64,11 @@ Error Handling:
           }
           url = `/me/onenote/notebooks/${notebook.id}/sections`;
         }
-        
+
         const response = await client.api(url).get() as { value: Section[] };
-        
+
         let result = JSON.stringify(response.value, null, 2);
-        
+
         // Check character limit
         if (result.length > CHARACTER_LIMIT) {
           const truncated = response.value.slice(0, Math.max(1, Math.floor(response.value.length / 2)));
@@ -80,7 +80,7 @@ Error Handling:
             message: `Response truncated from ${response.value.length} to ${truncated.length} sections. Use notebook filter to narrow results.`
           }, null, 2);
         }
-        
+
         return {
           content: [{
             type: "text",
@@ -94,30 +94,3 @@ Error Handling:
     }
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

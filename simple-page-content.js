@@ -39,62 +39,62 @@ async function getPageContent() {
       console.error('No access token found');
       return;
     }
-    
+
     // Initialize Graph client
     const client = Client.init({
       authProvider: (done) => {
         done(null, accessToken);
       }
     });
-    
+
     // List pages
     console.log("Fetching pages...");
     const pages = await client.api('/me/onenote/pages').get();
-    
+
     if (!pages || !pages.value || pages.value.length === 0) {
       console.log("No pages found");
       return;
     }
-    
+
     // Choose the first page
     const page = pages.value[0];
     console.log(`Using page: "${page.title}" (ID: ${page.id})`);
-    
+
     // Try to get the content
     console.log("Fetching page content...");
-    
+
     try {
       // Create direct HTTP request to the content endpoint
       const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${page.id}/content`;
       console.log(`Making request to: ${url}`);
-      
+
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status} ${response.statusText}`);
       }
-      
+
       const contentType = response.headers.get('content-type');
       console.log(`Content type: ${contentType}`);
-      
+
       const content = await response.text();
       console.log(`Content received! Length: ${content.length} characters`);
       console.log(`Content preview (first 100 chars): ${content.substring(0, 100).replace(/\n/g, ' ')}...`);
-      
+
       // Don't save content to file - just confirm it worked
       console.log("Content retrieval successful! Privacy preserved - not saving to disk.");
     } catch (error) {
       console.error("Error fetching content:", error);
     }
-    
+
   } catch (error) {
     console.error("Error:", error);
   }
 }
 
 // Run the function
-getPageContent(); 
+getPageContent();

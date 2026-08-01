@@ -32,7 +32,7 @@ def example_basic():
     </body>
     </html>
     """
-    
+
     readable_text = extract_readable_text(html_content)
     print("=" * 60)
     print("EXAMPLE 1: Basic Text Extraction")
@@ -58,19 +58,19 @@ mcp = FastMCP("your-mcp-server")
 @mcp.tool()
 async def get_onenote_page_text(page_id: str) -> str:
     '''Get OneNote page as readable text.
-    
+
     Args:
         page_id: OneNote page ID
-        
+
     Returns:
         Readable text extracted from page HTML
     '''
     # 1. Get HTML from OneNote API (your existing code)
     html_content = await your_onenote_api.get_page_content(page_id)
-    
+
     # 2. Convert to readable text
     readable_text = extract_readable_text(html_content)
-    
+
     # 3. Return clean text
     return readable_text
     """)
@@ -90,7 +90,7 @@ def example_summary():
     </body>
     </html>
     """
-    
+
     summary = extract_text_summary(html_content, max_length=100)
     print("=" * 60)
     print("EXAMPLE 3: Text Summary (first 100 chars)")
@@ -111,17 +111,17 @@ def example_office365_integration():
 @mcp.tool()
 async def get_onenote_page(page_id: str, format: str = "text") -> str:
     '''Get OneNote page content.
-    
+
     Args:
         page_id: OneNote page identifier
         format: "text" for readable text, "html" for raw HTML
-        
+
     Returns:
         Page content in requested format
     '''
     # Your existing code to get HTML
     html_content = await office365_api.get_onenote_page(page_id)
-    
+
     # If user wants readable text, extract it
     if format == "text":
         return extract_readable_text(html_content)
@@ -131,16 +131,15 @@ async def get_onenote_page(page_id: str, format: str = "text") -> str:
     print()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     example_basic()
     example_mcp_integration()
     example_summary()
     example_office365_integration()
-    
+
     print("=" * 60)
     print("To use in your MCP server:")
     print("1. Copy onenote_text_extractor.py to your project")
     print("2. Add beautifulsoup4 and lxml to requirements.txt")
     print("3. Import and use: from onenote_text_extractor import extract_readable_text")
     print("=" * 60)
-

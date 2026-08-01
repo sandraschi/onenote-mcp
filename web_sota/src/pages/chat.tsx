@@ -261,7 +261,7 @@ export function Chat() {
   const [ollamaUp, setOllamaUp] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [personalityId, setPersonalityId] = useState(loadPersonality);
-  const [customPrompt, setCustomPrompt] = useState("");
+  const [customPrompt] = useState("");
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [showScrollBtn, setShowScrollBtn] = useState(false);

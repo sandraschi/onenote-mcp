@@ -43,17 +43,17 @@ Add a new tool that returns readable text:
 ```python
 @mcp.tool()
 async def get_onenote_page_text(page_id: str) -> str:
-    '''Get OneNote page as readable text.
-    
+    """Get OneNote page as readable text.
+
     Args:
         page_id: OneNote page ID
-        
+
     Returns:
         Clean, readable text extracted from page HTML
-    '''
+    """
     # Get HTML from your OneNote API
     html_content = await your_onenote_api.get_page(page_id)
-    
+
     # Convert to readable text
     return extract_readable_text(html_content)
 ```
@@ -65,17 +65,17 @@ Modify existing tool to support both HTML and text:
 ```python
 @mcp.tool()
 async def get_onenote_page(page_id: str, format: str = "text") -> str:
-    '''Get OneNote page content.
-    
+    """Get OneNote page content.
+
     Args:
         page_id: OneNote page identifier
         format: Output format - "text" (readable) or "html" (raw)
-        
+
     Returns:
         Page content in requested format
-    '''
+    """
     html_content = await your_onenote_api.get_page(page_id)
-    
+
     if format == "text":
         return extract_readable_text(html_content)
     else:
@@ -89,17 +89,17 @@ If you always want readable text, modify your existing tool:
 ```python
 @mcp.tool()
 async def get_onenote_page(page_id: str) -> str:
-    '''Get OneNote page content as readable text.
-    
+    """Get OneNote page content as readable text.
+
     Args:
         page_id: OneNote page identifier
-        
+
     Returns:
         Clean, readable text from the page
-    '''
+    """
     # Get HTML
     html_content = await your_onenote_api.get_page(page_id)
-    
+
     # Always convert to readable text
     return extract_readable_text(html_content)
 ```
@@ -115,25 +115,26 @@ from office365_mcp.utils.onenote_text_extractor import extract_readable_text
 
 mcp = FastMCP("office-365-mcp")
 
+
 @mcp.tool()
 async def get_onenote_page(page_id: str) -> str:
-    '''Get OneNote page content as readable text.
-    
+    """Get OneNote page content as readable text.
+
     The office-365-mcp returns HTML that's hard to parse.
     This tool converts it to clean, readable text.
-    
+
     Args:
         page_id: OneNote page ID or title
-        
+
     Returns:
         Clean, readable text extracted from page HTML
-    '''
+    """
     # Your existing office-365-mcp code to get HTML
     html_content = await office365_client.get_onenote_page_content(page_id)
-    
+
     # Convert the idiosyncratic HTML to readable text
     readable_text = extract_readable_text(html_content)
-    
+
     return readable_text
 ```
 
@@ -167,11 +168,11 @@ print(result)
 
 ## Benefits
 
-✅ **Clean Output**: Removes OneNote's HTML quirks  
-✅ **Preserves Structure**: Maintains headings, lists, tables  
-✅ **AI-Friendly**: Easy for Claude/Cursor/Sandra to parse  
-✅ **Reusable**: Works with any OneNote HTML source  
-✅ **Simple**: Just one function call  
+✅ **Clean Output**: Removes OneNote's HTML quirks
+✅ **Preserves Structure**: Maintains headings, lists, tables
+✅ **AI-Friendly**: Easy for Claude/Cursor/Sandra to parse
+✅ **Reusable**: Works with any OneNote HTML source
+✅ **Simple**: Just one function call
 
 ## Troubleshooting
 
@@ -187,4 +188,3 @@ pip install beautifulsoup4 lxml
 **Formatting Issues:**
 - The extractor preserves structure but may need tweaking for specific HTML patterns
 - Modify `extract_readable_text()` if needed for your specific use case
-

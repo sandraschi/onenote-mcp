@@ -28,20 +28,20 @@ async function authenticate() {
     // Get an access token using device code flow
     console.log('Starting authentication...');
     console.log('You will see a URL and code to enter shortly...');
-    
+
     const tokenResponse = await credential.getToken(scopes);
-    
+
     // Save the token for future use
     const accessToken = tokenResponse.token;
     fs.writeFileSync(tokenFilePath, JSON.stringify({ token: accessToken }));
-    
+
     console.log('\nAuthentication successful!');
     console.log('Access token saved to:', tokenFilePath);
-    
+
   } catch (error) {
     console.error('Authentication error:', error);
   }
 }
 
 // Run the authentication
-authenticate(); 
+authenticate();

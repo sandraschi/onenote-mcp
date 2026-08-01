@@ -153,30 +153,3 @@ export function resetGraphClient(): void {
   graphClient = null;
   accessToken = null;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

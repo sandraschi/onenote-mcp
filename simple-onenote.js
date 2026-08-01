@@ -20,7 +20,7 @@ async function listNotebooks() {
 
     const tokenData = fs.readFileSync(tokenFilePath, 'utf8');
     let accessToken;
-    
+
     try {
       // Try to parse as JSON first (new format)
       const parsedToken = JSON.parse(tokenData);
@@ -45,10 +45,10 @@ async function listNotebooks() {
     // Get notebooks
     console.log('Fetching notebooks...');
     const response = await client.api('/me/onenote/notebooks').get();
-    
+
     console.log('\nYour OneNote Notebooks:');
     console.log('=======================');
-    
+
     if (response.value.length === 0) {
       console.log('No notebooks found.');
     } else {
@@ -63,4 +63,4 @@ async function listNotebooks() {
 }
 
 // Run the function
-listNotebooks(); 
+listNotebooks();

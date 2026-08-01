@@ -57,30 +57,3 @@ export type GetPageInput = z.infer<typeof GetPageInputSchema>;
 export type CreatePageInput = z.infer<typeof CreatePageInputSchema>;
 export type SearchPagesInput = z.infer<typeof SearchPagesInputSchema>;
 export type GetNotebookTOCInput = z.infer<typeof GetNotebookTOCInputSchema>;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

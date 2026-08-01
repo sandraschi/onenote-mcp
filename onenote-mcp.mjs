@@ -95,7 +95,7 @@ async function createGraphClient() {
       const tokenResponse = await credential.getToken(scopes);
       accessToken = tokenResponse.token;
       fs.writeFileSync(tokenFilePath, JSON.stringify({ token: accessToken }), 'utf8');
-      
+
       graphClient = Client.initWithMiddleware({
         authProvider: {
           getAccessToken: async () => {
@@ -103,7 +103,7 @@ async function createGraphClient() {
           }
         }
       });
-      
+
       return { type: 'device_code', client: graphClient };
     } catch (error) {
       console.error('Authentication error:', error);
@@ -210,10 +210,10 @@ server.registerTool(
     try {
       await ensureGraphClient();
       const response = await graphClient.api(`/me/onenote/notebooks`).get();
-      
+
       if (params.notebook_name) {
         const searchName = params.notebook_name.toLowerCase();
-        const notebook = response.value.find(n => 
+        const notebook = response.value.find(n =>
           n.displayName.toLowerCase().includes(searchName)
         );
         if (!notebook) {
@@ -254,10 +254,10 @@ server.registerTool(
     try {
       await ensureGraphClient();
       let url = '/me/onenote/sections';
-      
+
       if (params.notebook_name) {
         const notebooksResponse = await graphClient.api('/me/onenote/notebooks').get();
-        const notebook = notebooksResponse.value.find(n => 
+        const notebook = notebooksResponse.value.find(n =>
           n.displayName.toLowerCase().includes(params.notebook_name.toLowerCase())
         );
         if (!notebook) {
@@ -265,7 +265,7 @@ server.registerTool(
         }
         url = `/me/onenote/notebooks/${notebook.id}/sections`;
       }
-      
+
       const response = await graphClient.api(url).get();
       return {
         content: [{
@@ -293,7 +293,7 @@ server.registerTool(
     try {
       await ensureGraphClient();
       const sectionsResponse = await graphClient.api(`/me/onenote/sections`).get();
-      
+
       if (sectionsResponse.value.length === 0) {
         return {
           content: [{
@@ -302,10 +302,10 @@ server.registerTool(
           }]
         };
       }
-      
+
       let sectionId;
       if (params.section_name) {
-        const section = sectionsResponse.value.find(s => 
+        const section = sectionsResponse.value.find(s =>
           s.displayName.toLowerCase().includes(params.section_name.toLowerCase())
         );
         if (!section) {
@@ -315,7 +315,7 @@ server.registerTool(
       } else {
         sectionId = sectionsResponse.value[0].id;
       }
-      
+
       const response = await graphClient.api(`/me/onenote/sections/${sectionId}/pages`).get();
       return {
         content: [{
@@ -343,12 +343,12 @@ server.registerTool(
     try {
       await ensureGraphClient();
       const pagesResponse = await graphClient.api('/me/onenote/pages').get();
-      
+
       let targetPage;
       if (params.page_id) {
         targetPage = pagesResponse.value.find(p => p.id === params.page_id);
         if (!targetPage) {
-          targetPage = pagesResponse.value.find(p => 
+          targetPage = pagesResponse.value.find(p =>
             p.title && p.title.toLowerCase().includes(params.page_id.toLowerCase())
           );
         }
@@ -361,18 +361,18 @@ server.registerTool(
         }
         targetPage = pagesResponse.value[0];
       }
-      
+
       const url = `https://graph.microsoft.com/v1.0/me/onenote/pages/${targetPage.id}/content`;
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status} ${response.statusText}`);
       }
-      
+
       const content = await response.text();
       return {
         content: [{
@@ -402,14 +402,14 @@ server.registerTool(
     try {
       await ensureGraphClient();
       const sectionsResponse = await graphClient.api(`/me/onenote/sections`).get();
-      
+
       if (sectionsResponse.value.length === 0) {
         throw new Error("No sections found");
       }
-      
+
       let sectionId;
       if (params.section_name) {
-        const section = sectionsResponse.value.find(s => 
+        const section = sectionsResponse.value.find(s =>
           s.displayName.toLowerCase().includes(params.section_name.toLowerCase())
         );
         if (!section) {
@@ -419,7 +419,7 @@ server.registerTool(
       } else {
         sectionId = sectionsResponse.value[0].id;
       }
-      
+
       const html = `<!DOCTYPE html>
 <html>
   <head>
@@ -429,12 +429,12 @@ server.registerTool(
     ${params.content}
   </body>
 </html>`;
-      
+
       const response = await graphClient
         .api(`/me/onenote/sections/${sectionId}/pages`)
         .header("Content-Type", "application/xhtml+xml")
         .post(html);
-      
+
       return {
         content: [{
           type: "text",
@@ -461,12 +461,12 @@ server.registerTool(
     try {
       await ensureGraphClient();
       const response = await graphClient.api(`/me/onenote/pages`).get();
-      
+
       const searchTerm = params.query.toLowerCase();
       const filteredPages = response.value.filter(page => {
         return page.title && page.title.toLowerCase().includes(searchTerm);
       });
-      
+
       return {
         content: [{
           type: "text",
@@ -494,17 +494,17 @@ server.registerTool(
       await ensureGraphClient();
       const notebooksResponse = await graphClient.api('/me/onenote/notebooks').get();
       const notebooks = notebooksResponse.value;
-      
+
       if (notebooks.length === 0) {
         return {
           content: [{ type: "text", text: "No notebooks found." }]
         };
       }
-      
+
       let notebook;
       if (params.notebook_name) {
         const searchName = params.notebook_name.toLowerCase();
-        notebook = notebooks.find(n => 
+        notebook = notebooks.find(n =>
           n.displayName.toLowerCase().includes(searchName)
         );
         if (!notebook) {
@@ -514,18 +514,18 @@ server.registerTool(
       } else {
         notebook = notebooks[0];
       }
-      
+
       const sectionsResponse = await graphClient.api(`/me/onenote/notebooks/${notebook.id}/sections`).get();
       const sections = sectionsResponse.value;
-      
+
       let totalPages = 0;
       const tocSections = [];
-      
+
       for (const section of sections) {
         const pagesResponse = await graphClient.api(`/me/onenote/sections/${section.id}/pages`).get();
         const pages = pagesResponse.value;
         totalPages += pages.length;
-        
+
         tocSections.push({
           name: section.displayName,
           pageCount: pages.length,
@@ -537,7 +537,7 @@ server.registerTool(
           }))
         });
       }
-      
+
       const lines = [];
       lines.push(`# ${notebook.displayName}`);
       lines.push('');
@@ -545,7 +545,7 @@ server.registerTool(
       lines.push('');
       lines.push('---');
       lines.push('');
-      
+
       for (const section of tocSections) {
         lines.push(`## ${section.name} (${section.pageCount} pages)`);
         lines.push('');
@@ -559,13 +559,13 @@ server.registerTool(
         }
         lines.push('');
       }
-      
+
       const tocData = {
         notebook: notebook.displayName,
         stats: { sections: sections.length, pages: totalPages },
         sections: tocSections
       };
-      
+
       return {
         content: [
           { type: "text", text: lines.join('\n') },
@@ -584,20 +584,20 @@ async function main() {
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    
+
     console.error('OneNote MCP Server started successfully.');
     console.error('Use the "onenote_authenticate" tool to start authentication,');
     console.error('or use "onenote_save_token" if you already have a token.');
-    
+
     process.on('SIGINT', () => {
       process.exit(0);
     });
-    
+
     process.on('uncaughtException', (error) => {
       console.error('Uncaught exception:', error);
       process.exit(1);
     });
-    
+
     process.on('unhandledRejection', (reason, promise) => {
       console.error('Unhandled rejection at:', promise, 'reason:', reason);
       process.exit(1);
@@ -611,16 +611,16 @@ async function main() {
 
 main();
 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
-main(); 
+main();
+main();
+main();
+main();
+main();
+main();
+main();
+main();
+main();
+main();
+main();
+main();
+main();

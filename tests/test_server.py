@@ -1,7 +1,8 @@
 """Basic tests for onenote-mcp server."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 def test_server_imports():
