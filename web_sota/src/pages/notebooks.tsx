@@ -10,7 +10,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchJson } from "@/lib/api";
 
 type Notebook = {
@@ -69,6 +69,81 @@ export function Notebooks() {
   const [newContent, setNewContent] = useState("");
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState("");
+  const [authOk, setAuthOk] = useState<boolean | null>(null);
+  const [authFlow, setAuthFlow] = useState<{
+    flow_id: string;
+    user_code: string;
+    verification_uri: string;
+  } | null>(null);
+  const authTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopAuthPolling = () => {
+    if (authTimerRef.current) {
+      clearInterval(authTimerRef.current);
+      authTimerRef.current = null;
+    }
+  };
+
+  const loadAuthStatus = useCallback(async () => {
+    try {
+      const data = await fetchJson<{ authenticated: boolean }>("/auth/status");
+      setAuthOk(data.authenticated === true);
+    } catch {
+      setAuthOk(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAuthStatus();
+  }, [loadAuthStatus]);
+
+  const startAuth = async () => {
+    setError("");
+    try {
+      const data = await fetchJson<{
+        success: boolean;
+        flow_id?: string;
+        user_code?: string;
+        verification_uri?: string;
+        error?: string;
+      }>("/auth/device", { method: "POST" });
+      if (!data.success || !data.flow_id) {
+        setError(data.error || "Auth start failed");
+        return;
+      }
+      setAuthFlow({
+        flow_id: data.flow_id,
+        user_code: data.user_code || "",
+        verification_uri: data.verification_uri || "",
+      });
+      authTimerRef.current = setInterval(async () => {
+        try {
+          const poll = await fetchJson<{
+            status: string;
+            account?: string;
+            error?: string;
+          }>(`/auth/poll?flow_id=${data.flow_id}`);
+          if (poll.status === "authorized") {
+            stopAuthPolling();
+            setAuthFlow(null);
+            setAuthOk(true);
+            setNotice(
+              `Connected as ${poll.account || "your Microsoft account"}`,
+            );
+            loadNotebooks();
+          } else if (poll.status === "error") {
+            stopAuthPolling();
+            setAuthFlow(null);
+            setError(poll.error || "Authentication failed");
+          }
+        } catch {
+          /* keep polling */
+        }
+      }, 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const loadNotebooks = useCallback(async () => {
     setLoading(true);
@@ -240,6 +315,57 @@ export function Notebooks() {
         <p className="text-sm text-red-400 bg-red-950/30 border border-red-900 rounded px-3 py-2">
           {error}
         </p>
+      )}
+
+      {!authOk && (
+        <div
+          className="rounded-lg border border-amber-800 bg-amber-950/20 p-4 flex items-center justify-between gap-4"
+          data-testid="auth-banner"
+        >
+          <div>
+            <p className="text-sm text-amber-300 font-medium">
+              OneNote not connected
+            </p>
+            <p className="text-xs text-slate-400">
+              Connect your Microsoft account to browse notebooks and pages.
+            </p>
+          </div>
+          {!authFlow ? (
+            <button
+              type="button"
+              data-testid="auth-connect"
+              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-3 py-1.5 shrink-0"
+              onClick={startAuth}
+            >
+              Connect Microsoft account
+            </button>
+          ) : (
+            <div className="text-right shrink-0 space-y-1">
+              <p className="text-xs text-slate-300">
+                Open{" "}
+                <a
+                  href={authFlow.verification_uri}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 underline"
+                >
+                  {authFlow.verification_uri}
+                </a>{" "}
+                and enter code{" "}
+                <code
+                  data-testid="auth-user-code"
+                  className="font-mono text-white bg-slate-800 px-2 py-0.5 rounded"
+                >
+                  {authFlow.user_code}
+                </code>
+              </p>
+              <p className="text-xs text-slate-500 flex items-center justify-end gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" /> Waiting for
+                authorization...
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {searchResults && (

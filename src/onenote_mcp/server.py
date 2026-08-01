@@ -252,6 +252,134 @@ async def health_check(request: Request) -> JSONResponse:
     return JSONResponse({"status": "healthy", "server": "onenote-mcp"})
 
 
+# ---- Webapp activity log (ring buffer) ----
+
+from .activity_log import ActivityLog
+
+_log = ActivityLog()
+
+
+@app.custom_route("/api/logs", methods=["GET"])
+async def api_get_logs(request: Request) -> JSONResponse:
+    qp = request.query_params
+    try:
+        limit = int(qp.get("limit", 50))
+        offset = int(qp.get("offset", 0))
+    except (TypeError, ValueError):
+        limit, offset = 50, 0
+    return JSONResponse(
+        _log.query(
+            limit=limit,
+            offset=offset,
+            level=qp.get("level"),
+            kind=qp.get("kind"),
+            search=qp.get("search"),
+            sort=qp.get("sort", "desc"),
+            after_id=qp.get("after_id"),
+        )
+    )
+
+
+@app.custom_route("/api/logs", methods=["DELETE"])
+async def api_clear_logs(request: Request) -> JSONResponse:
+    _log.clear()
+    return JSONResponse({"success": True, "message": "Logs cleared."})
+
+
+@app.custom_route("/api/logs/stats", methods=["GET"])
+async def api_logs_stats(request: Request) -> JSONResponse:
+    return JSONResponse(_log.stats())
+
+
+@app.custom_route("/api/logs/export", methods=["GET"])
+async def api_logs_export(request: Request) -> JSONResponse:
+    qp = request.query_params
+    content = _log.export(
+        format=qp.get("format", "json"),
+        level=qp.get("level"),
+        kind=qp.get("kind"),
+        search=qp.get("search"),
+    )
+    from starlette.responses import Response
+
+    media = "text/csv" if qp.get("format") == "csv" else "application/json"
+    return Response(
+        content=content,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="logs.{qp.get("format", "json")}"'},
+    )
+
+
+# ---- Webapp auth (non-blocking device-code flow) ----
+
+_auth_flows: dict[str, dict[str, Any]] = {}
+
+
+def _start_auth_flow() -> dict[str, Any]:
+    import msal
+
+    app = msal.PublicClientApplication(CLIENT_ID, authority="https://login.microsoftonline.com/common")
+    flow = app.initiate_device_flow(scopes=SCOPES)
+    if "user_code" not in flow:
+        raise ValueError("Failed to create device flow")
+    flow_id = flow.get("device_code", "")[-8:]
+    _auth_flows[flow_id] = {"flow": flow, "status": "pending", "result": None}
+
+    def _wait():
+        result = app.acquire_token_by_device_flow(flow)
+        if "access_token" in result:
+            save_access_token(result["access_token"])
+            _auth_flows[flow_id]["result"] = {
+                "success": True,
+                "account": result.get("id_token_claims", {}).get("preferred_username", ""),
+            }
+            _auth_flows[flow_id]["status"] = "authorized"
+        else:
+            _auth_flows[flow_id]["result"] = {
+                "success": False,
+                "error": result.get("error_description", "Authentication failed"),
+            }
+            _auth_flows[flow_id]["status"] = "error"
+
+    import threading
+
+    threading.Thread(target=_wait, daemon=True).start()
+    return {
+        "flow_id": flow_id,
+        "user_code": flow["user_code"],
+        "verification_uri": flow.get("verification_uri", "https://microsoft.com/devicelogin"),
+        "expires_in": flow.get("expires_in", 900),
+        "interval": flow.get("interval", 5),
+    }
+
+
+@app.custom_route("/api/auth/device", methods=["POST"])
+async def api_auth_device(request: Request) -> JSONResponse:
+    try:
+        return JSONResponse({"success": True, **(_start_auth_flow())})
+    except Exception as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
+
+
+@app.custom_route("/api/auth/poll", methods=["GET"])
+async def api_auth_poll(request: Request) -> JSONResponse:
+    flow_id = request.query_params.get("flow_id", "")
+    state = _auth_flows.get(flow_id)
+    if not state:
+        return JSONResponse({"success": False, "status": "error", "error": "unknown flow"}, status_code=404)
+    if state["status"] == "pending":
+        return JSONResponse({"success": True, "status": "pending"})
+    return JSONResponse(
+        {"success": state["result"].get("success", False), "status": state["status"], **state["result"]}
+    )
+
+
+@app.custom_route("/api/auth/status", methods=["GET"])
+async def api_auth_status(request: Request) -> JSONResponse:
+    token = load_access_token()
+    return JSONResponse({"authenticated": bool(token)})
+
+
 # ---- REST API for the webapp (notebook/section/page browser) ----
 
 
