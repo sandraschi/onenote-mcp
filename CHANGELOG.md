@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.0.1] - 2026-08-01 (assfix follow-up)
+
+### Fixed
+- Settings page LLM section called non-existent `/api/llm/providers` and fell back
+  to a hardcoded `llama3.2:3b` mock; rewired to the real `/api/llm/discover` with a
+  graceful "no local LLM detected" state and no fake model data.
+- Hardcoded/hallucinated ports in the frontend: `settings.tsx` (`107xx` placeholder),
+  `help.tsx` (10894/10895), `apps.tsx` (static catalog with wrong ports). Apps Hub now
+  fetches the backend `/api/fleet/apps` registry endpoint.
+- Tauri NSIS production bug: `lib/api.ts` + `dashboard.tsx` used relative `/api`, which
+  works under the Vite proxy but fails in the built WebView. API_BASE now resolves to
+  `http://127.0.0.1:10907` inside Tauri.
+- pyright gate: `Response` return in `/api/logs/export` (typed ignore with code);
+  pyright added to dev deps and as a blocking CI step.
+- `print()` in non-test code converted to `logger` calls; phantom `fastapi` dependency
+  removed (FastMCP custom routes are Starlette-based).
+- justfile mojibake box-drawing comments replaced with ASCII; README badges refreshed
+  (Python 3.12+, FastMCP 3.4).
+
+### Added
+- `docs/`: CONFIGURATION, DEVELOPMENT, TOOLS, TROUBLESHOOTING, ONBOARDING.
+- Tool annotations (`READ_ONLY`/`MUTATING`/DESTRUCTIVE) on all 13 tools.
+- `show_notebooks_card` — Prefab UI in-chat card (13th tool).
+- `skills/onenote/SKILL.md` + `skill://onenote` MCP resource + `GET /api/skills/{name}`.
+- Chat page is now skill-first: loads the skill content on mount and composes it with
+  the personality prompt.
+- `/api/llm/discover` probes LM Studio (:1234) and vLLM (:8000) in addition to Ollama,
+  returning per-provider model lists.
+- Dashboard listens for the Tauri `backend-status` event and adds a Restart Backend
+  button when the backend is offline.
+- `backend.rs`: multi-layer port kill (Stop-Process -> taskkill -> UAC -> 240s poll)
+  and a TCP health-check loop that emits `backend-status`.
+- `data-testid` on settings/status/tools/help/apps/logging pages; contrast fixes
+  (`text-slate-400/500` -> `slate-300`, `text-xs` -> `text-sm`).
+
 ## [1.0.0] - 2026-08-01
 
 ### Fixed

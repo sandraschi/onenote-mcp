@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function Tools() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="tools-page">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
             Tool Inventory
           </h2>
-          <p className="text-slate-400">
+          <p className="text-slate-300">
             Available portmanteau interfaces for OneNote Knowledge Management
           </p>
         </div>

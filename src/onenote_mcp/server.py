@@ -13,6 +13,9 @@ import httpx
 import msal
 from fastmcp import FastMCP
 from fastmcp.server import create_proxy
+from fastmcp.tools.base import ToolResult
+from prefab_ui import PrefabApp
+from prefab_ui.components import Heading, Row, Text
 from pydantic import Field
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -57,7 +60,7 @@ def load_access_token() -> str | None:
                 _access_token = token_data
             return _access_token
     except Exception as e:
-        print(f"Error reading access token file: {e}")
+        logger.warning("Error reading access token file: %s", e)
 
     # Check environment variable
     if env_token := os.getenv("GRAPH_ACCESS_TOKEN"):
@@ -74,7 +77,7 @@ def save_access_token(token: str) -> None:
 
     token_data = json.dumps({"token": token}, indent=2)
     TOKEN_FILE_PATH.write_text(token_data)
-    print(f"Access token saved to {TOKEN_FILE_PATH}")
+    logger.info("Access token saved to %s", TOKEN_FILE_PATH)
 
 
 async def get_graph_client() -> httpx.AsyncClient:
@@ -102,10 +105,7 @@ async def authenticate_device_code() -> dict[str, Any]:
     if "user_code" not in flow:
         raise ValueError("Failed to create device flow")
 
-    print("To authenticate, please:")
-    print(f"1. Go to: {flow['verification_uri']}")
-    print(f"2. Enter the code: {flow['user_code']}")
-    print("3. Sign in with your Microsoft account")
+    logger.info("To authenticate: %s (code: %s)", flow["verification_uri"], flow["user_code"])
 
     # Wait for user to complete authentication
     result = app.acquire_token_by_device_flow(flow)
@@ -260,6 +260,10 @@ async def get_notebook_toc(notebook_id: str) -> TOCData:
 # Create FastMCP app
 app = FastMCP(name="onenote-mcp", instructions="Microsoft OneNote integration via Model Context Protocol")
 
+# Tool annotations (TOOL_DESIGN_STANDARDS.md §9 — dict format, FastMCP 3.x)
+_READONLY = {"readonly": True}
+_MUTATING = {}
+
 
 @app.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> JSONResponse:
@@ -281,7 +285,18 @@ async def api_v1_health(request: Request) -> JSONResponse:
 
 # ---- Webapp REST API (fleet SOTA endpoints) ----
 
-_TAGGED_SKILLS: list[dict[str, str]] = []
+# Adjacent fleet webapps, sourced from mcp-central-docs/operations/WEBAPP_PORTS.md.
+# Single source of truth for the Apps Hub - the frontend never hardcodes ports.
+_FLEET_APPS: tuple[dict[str, Any], ...] = (
+    {"name": "teleconference-mcp", "port": 10886, "description": "Webapp frontend"},
+    {"name": "myai", "port": 10888, "description": "Webapp frontend"},
+    {"name": "obsidian-mcp", "port": 10890, "description": "Web dashboard frontend"},
+    {"name": "yahboom-mcp", "port": 10893, "description": "Web dashboard frontend"},
+    {"name": "dreame-mcp", "port": 10895, "description": "Web dashboard frontend"},
+    {"name": "mywienerlinien", "port": 10896, "description": "Webapp dashboard"},
+)
+
+_TAGGED_SKILLS: list[dict[str, str]] = [{"name": "onenote", "uri": "skill://onenote"}]
 _HELP_TOOLS: list[dict[str, str]] = []
 
 
@@ -296,6 +311,7 @@ _TOOL_REGISTRY: tuple[str, ...] = (
     "onenote_create_page",
     "onenote_search_pages",
     "onenote_get_notebook_toc",
+    "show_notebooks_card",
     "onenote_help",
     "shutdown_server",
 )
@@ -348,30 +364,58 @@ async def api_capabilities(request: Request) -> JSONResponse:
     )
 
 
+@app.custom_route("/api/fleet/apps", methods=["GET"])
+async def api_fleet_apps(request: Request) -> JSONResponse:
+    return JSONResponse({"apps": list(_FLEET_APPS)})
+
+
 @app.custom_route("/api/skills", methods=["GET"])
 async def api_skills(request: Request) -> JSONResponse:
     return JSONResponse({"skills": _TAGGED_SKILLS})
 
 
+@app.custom_route("/api/skills/{skill_name}", methods=["GET"])
+async def api_skill_content(request: Request) -> JSONResponse:
+    skill_name = request.path_params["skill_name"]
+    skill_path = Path(__file__).parent / "skills" / skill_name / "SKILL.md"
+    if skill_path.exists():
+        return JSONResponse({"name": skill_name, "content": skill_path.read_text(encoding="utf-8")})
+    return JSONResponse({"success": False, "error": "skill not found"}, status_code=404)
+
+
 @app.custom_route("/api/llm/discover", methods=["GET"])
 async def api_llm_discover(request: Request) -> JSONResponse:
-    ollama_detected = False
-    configured_model = ""
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            r = await client.get("http://127.0.0.1:11434/api/tags")
-            if r.status_code == 200:
-                ollama_detected = True
-                models = r.json().get("models", [])
-                if models:
-                    configured_model = models[0].get("name", "")
-    except Exception:
-        pass
+    providers: dict[str, dict[str, Any]] = {}
+
+    async def _probe(name: str, port: int, model_path: str) -> None:
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                r = await client.get(f"http://127.0.0.1:{port}{model_path}")
+                if r.status_code != 200:
+                    providers[name] = {"detected": False, "port": port, "models": []}
+                    return
+                data = r.json()
+                if name == "ollama":
+                    models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+                else:
+                    models = [m.get("id", "") for m in data.get("data", []) if m.get("id")]
+                providers[name] = {"detected": True, "port": port, "models": models}
+        except Exception:
+            providers[name] = {"detected": False, "port": port, "models": []}
+
+    await asyncio.gather(
+        _probe("ollama", 11434, "/api/tags"),
+        _probe("lm_studio", 1234, "/v1/models"),
+        _probe("vllm", 8000, "/v1/models"),
+    )
+
+    ollama = providers.get("ollama", {})
+    configured_model = (ollama.get("models") or [""])[0]
     return JSONResponse(
         {
-            "ollama_detected": ollama_detected,
+            "ollama_detected": bool(ollama.get("detected")),
             "configured_model": configured_model,
-            "providers": {"ollama": {"detected": ollama_detected, "port": 11434}},
+            "providers": providers,
         }
     )
 
@@ -460,7 +504,7 @@ async def api_logs_export(request: Request) -> JSONResponse:
         content=content,
         media_type=media,
         headers={"Content-Disposition": f'attachment; filename="logs.{qp.get("format", "json")}"'},
-    )
+    )  # type: ignore[return-value]
 
 
 # ---- Webapp auth (non-blocking device-code flow) ----
@@ -609,7 +653,7 @@ if MCP_BRIDGE_URLS:
             app.add_provider(create_proxy(url))
 
 
-@app.tool()
+@app.tool(annotations=_MUTATING)
 async def authenticate() -> str:
     """Start the Microsoft authentication flow using device code.
 
@@ -627,7 +671,7 @@ async def authenticate() -> str:
         return f"❌ Authentication failed: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_MUTATING)
 async def onenote_save_access_token(
     token: Annotated[str, Field(description="The Microsoft Graph access token to save")],
 ) -> str:
@@ -648,7 +692,7 @@ async def onenote_save_access_token(
         return f"❌ Failed to save token: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_READONLY)
 async def onenote_list_notebooks() -> str:
     """List all Microsoft OneNote notebooks accessible to the signed-in account.
 
@@ -673,7 +717,7 @@ async def onenote_list_notebooks() -> str:
         return f"❌ Failed to list notebooks: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_READONLY)
 async def onenote_get_notebook(
     notebook_id: Annotated[str, Field(description="The ID of the notebook to retrieve")],
 ) -> str:
@@ -698,7 +742,7 @@ async def onenote_get_notebook(
         return f"❌ Failed to get notebook: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_READONLY)
 async def onenote_list_sections(notebook_id: Annotated[str, Field(description="The ID of the notebook")]) -> str:
     """List all sections in a OneNote notebook.
 
@@ -724,7 +768,7 @@ async def onenote_list_sections(notebook_id: Annotated[str, Field(description="T
         return f"❌ Failed to list sections: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_READONLY)
 async def onenote_list_pages(section_id: Annotated[str, Field(description="The ID of the section")]) -> str:
     """List all pages in a OneNote section.
 
@@ -751,7 +795,7 @@ async def onenote_list_pages(section_id: Annotated[str, Field(description="The I
         return f"❌ Failed to list pages: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_READONLY)
 async def onenote_get_page(page_id: Annotated[str, Field(description="The ID of the page to retrieve")]) -> str:
     """Get the complete HTML content of a OneNote page.
 
@@ -793,7 +837,7 @@ async def onenote_get_page(page_id: Annotated[str, Field(description="The ID of 
         return f"❌ Failed to get page content: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_MUTATING)
 async def onenote_create_page(
     notebook_id: Annotated[str, Field(description="The ID of the notebook to create the page in")],
     title: Annotated[str, Field(description="The title of the new page")],
@@ -815,7 +859,7 @@ async def onenote_create_page(
         return f"❌ Failed to create page: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_READONLY)
 async def onenote_search_pages(query: Annotated[str, Field(description="Search query string")]) -> str:
     """Search for pages across all OneNote notebooks.
 
@@ -842,7 +886,7 @@ async def onenote_search_pages(query: Annotated[str, Field(description="Search q
         return f"❌ Search failed: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations=_READONLY)
 async def onenote_get_notebook_toc(notebook_id: Annotated[str, Field(description="The ID of the notebook")]) -> str:
     """Generate a table of contents for a OneNote notebook.
 
@@ -877,7 +921,7 @@ async def onenote_get_notebook_toc(notebook_id: Annotated[str, Field(description
         return f"❌ Failed to generate TOC: {e!s}"
 
 
-@app.tool()
+@app.tool(annotations={"destructive": True})
 async def shutdown_server() -> str:
     """Shut down the onenote-mcp server gracefully.
 
@@ -899,12 +943,12 @@ async def shutdown_server() -> str:
     return "✅ Server shutting down..."
 
 
-@app.tool()
+@app.tool(annotations=_READONLY)
 async def onenote_help() -> str:
     """List the available OneNote MCP tools and when to use each.
 
     ## Return Format
-    Markdown string enumerating the 11 tools with one-line usage notes.
+    Markdown string enumerating the 13 tools with one-line usage notes.
 
     ## Examples
     onenote_help()
@@ -920,7 +964,46 @@ async def onenote_help() -> str:
 - `create_page` - add a page with HTML body
 - `search_pages` - full-text search across notebooks
 - `get_notebook_toc` - sections + pages overview
+- `show_notebooks_card` - notebooks as an in-chat Prefab card
 - `shutdown_server` - stop the server"""
+
+
+@app.tool(annotations=_READONLY)
+async def show_notebooks_card() -> ToolResult:
+    """Show the user's OneNote notebooks as a rich in-chat card.
+
+    ## Return Format
+    ToolResult: PrefabApp card with one row per notebook, plus a plain-text
+    markdown fallback for hosts that do not render apps.
+
+    ## Examples
+    show_notebooks_card()
+    """
+    try:
+        notebooks = await list_notebooks()
+    except Exception as e:
+        return ToolResult(content=f"❌ Failed to list notebooks: {e!s}")
+    if not notebooks:
+        return ToolResult(content="No notebooks found")
+    lines = "📓 Your OneNote Notebooks:\n\n"
+    lines += "\n".join(f"- **{n.displayName}** (`{n.id}`)" for n in notebooks)
+    with PrefabApp(title="OneNote Notebooks") as card:
+        Heading(f"{len(notebooks)} notebooks")
+        for notebook in notebooks:
+            Row(children=[Text(notebook.displayName), Text(notebook.id)])
+    return ToolResult(content=lines, structured_content=card)
+
+
+@app.resource("skill://onenote")
+def onenote_skill() -> str:
+    """The onenote-mcp skill - how to use the server effectively."""
+    skill_path = Path(__file__).parent / "skills" / "onenote" / "SKILL.md"
+    if skill_path.exists():
+        return skill_path.read_text(encoding="utf-8")
+    return (
+        "OneNote MCP: list notebooks with onenote_list_notebooks(), explore with "
+        "onenote_get_notebook_toc(), read pages with onenote_get_page()."
+    )
 
 
 # ASGI app for uvicorn (fleet standard: serve mcp.http_app(), never the raw FastMCP object)

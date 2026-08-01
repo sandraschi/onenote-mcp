@@ -47,7 +47,7 @@ If you prefer not to use `just`:
    uv run python -m onenote_mcp.server
 
    # HTTP mode (for web dashboard)
-   uv run uvicorn onenote_mcp.server:app --port 10907
+   uv run uvicorn onenote_mcp.server:http_app --port 10907
    ```
 5. Open `http://localhost:10907` or the frontend URL.
 

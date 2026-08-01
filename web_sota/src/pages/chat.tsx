@@ -262,6 +262,7 @@ export function Chat() {
   const [loading, setLoading] = useState(false);
   const [personalityId, setPersonalityId] = useState(loadPersonality);
   const [customPrompt] = useState("");
+  const [skillContent, setSkillContent] = useState("");
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -299,6 +300,24 @@ export function Chat() {
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${BACKEND}/api/skills`);
+        if (!r.ok) return;
+        const d = (await r.json()) as { skills?: { name?: string }[] };
+        const skill = (d.skills ?? []).find((s) => s.name === "onenote");
+        if (!skill?.name) return;
+        const cr = await fetch(`${BACKEND}/api/skills/${skill.name}`);
+        if (!cr.ok) return;
+        const cd = (await cr.json()) as { content?: string };
+        if (cd.content) setSkillContent(cd.content);
+      } catch {
+        // skill unavailable - fall back to hardcoded personalities
+      }
+    })();
+  }, []);
+
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }, []);
@@ -316,11 +335,15 @@ export function Chat() {
     if (isNearBottomRef.current) scrollToBottom(!loading);
   }, [messages, loading, scrollToBottom]);
 
-  const systemPrompt =
+  const basePrompt =
     personalityId === "custom"
       ? customPrompt ||
         "You are a helpful assistant for OneNote MCP, a OneNote notebook server for creating, searching, and organizing notes."
       : personality.prompt;
+
+  const systemPrompt = skillContent
+    ? `${skillContent}\n\n---\n\n## Role\n${basePrompt}`
+    : basePrompt;
 
   const send = useCallback(
     async (overrideMsg?: string) => {

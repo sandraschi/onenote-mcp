@@ -1,4 +1,11 @@
-export const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+// In dev the Vite proxy maps /api -> 127.0.0.1:10907. The built dist served by
+// the Tauri WebView has no proxy, so the API base must be absolute there.
+export const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (isTauri ? "http://127.0.0.1:10907" : "/api");
 
 export async function fetchJson<T = unknown>(
   path: string,

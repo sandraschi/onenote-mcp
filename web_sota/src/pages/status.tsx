@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function Status() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="status-page">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
             Microsoft Graph Status
           </h2>
-          <p className="text-slate-400">
+          <p className="text-slate-300">
             API health and synchronization telemetry
           </p>
         </div>

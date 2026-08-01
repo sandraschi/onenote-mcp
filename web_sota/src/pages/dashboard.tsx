@@ -1,6 +1,8 @@
 import { Activity, Cpu, HardDrive, Network, Shield } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { API_BASE } from "@/lib/api";
 
 interface StatusPayload {
   status?: string;
@@ -21,35 +23,40 @@ export function Dashboard() {
   const [logStats, setLogStats] = useState<LogStats | null>(null);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [error, setError] = useState("");
+  const [restarting, setRestarting] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/status`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      setStatus(d);
+      setBackendOk(true);
+      setError("");
+      try {
+        const lr = await fetch(`${API_BASE}/logs/stats`);
+        if (lr.ok) setLogStats(await lr.json());
+      } catch {
+        /* log stats optional */
+      }
+    } catch (e) {
+      setBackendOk(false);
+      setError(e instanceof Error ? e.message : "Backend unreachable");
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     let delay = 1000;
     const poll = async () => {
-      try {
-        const r = await fetch("/api/status");
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
-        if (!cancelled) {
-          setStatus(d);
-          setBackendOk(true);
-          setError("");
-        }
-        try {
-          const lr = await fetch("/api/logs/stats");
-          if (lr.ok && !cancelled) setLogStats(await lr.json());
-        } catch {
-          /* log stats optional */
-        }
-        delay = 1000;
-      } catch (e) {
-        if (!cancelled) {
-          setBackendOk(false);
-          setError(e instanceof Error ? e.message : "Backend unreachable");
-        }
-        delay = Math.min(delay * 2, 16000);
-      }
+      if (cancelled) return;
+      const before = backendOk;
+      await refresh();
       if (!cancelled) {
+        delay =
+          backendOk === false && before === false
+            ? Math.min(delay * 2, 16000)
+            : 1000;
         setTimeout(poll, delay);
       }
     };
@@ -57,6 +64,43 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen<string>("backend-status", (event) => {
+          if (event.payload === "ready") {
+            setRestarting(false);
+            refresh();
+          } else if (
+            typeof event.payload === "string" &&
+            event.payload.startsWith("error:")
+          ) {
+            setBackendOk(false);
+            setRestarting(false);
+          }
+        });
+      } catch {
+        // Not inside Tauri - HTTP polling handles it
+      }
+    })();
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [refresh]);
+
+  const restartBackend = useCallback(async () => {
+    setRestarting(true);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("start_backend");
+    } catch {
+      setRestarting(false); // not in Tauri - HTTP poll will update
+    }
   }, []);
 
   const uptime = status?.uptime_seconds
@@ -92,6 +136,18 @@ export function Dashboard() {
                 ? "Connected"
                 : "Offline"}
           </span>
+          {backendOk === false && (
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="restart-backend"
+              className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              onClick={restartBackend}
+              disabled={restarting}
+            >
+              {restarting ? "Restarting..." : "Restart Backend"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -179,7 +235,7 @@ export function Dashboard() {
           <CardContent>
             <div className="h-[200px] font-mono text-xs p-4 overflow-y-auto border border-slate-800 rounded-md bg-slate-900/50 text-slate-300 space-y-1">
               {logStats === null ? (
-                <p className="text-slate-400">Loading activity log...</p>
+                <p className="text-slate-300">Loading activity log...</p>
               ) : (
                 <p className="text-slate-300">
                   {logStats.total ?? 0} entries logged (ring buffer of{" "}

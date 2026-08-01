@@ -103,6 +103,13 @@ jobs:
           if (Test-Path 'tests') { $paths += 'tests' }
           uv run ruff format --check @paths
 
+      - name: Pyright typecheck
+        shell: pwsh
+        run: |
+          $paths = @('src')
+          if (Test-Path 'api') { $paths += 'api' }
+          uv run pyright @paths
+
       - name: Pytest
         if: hashFiles('tests/**') != ''
         shell: pwsh

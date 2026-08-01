@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function Help() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="help-page">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
             Help & Documentation
           </h2>
-          <p className="text-slate-400">
+          <p className="text-slate-300">
             Guidelines, standards, and usage patterns
           </p>
         </div>
@@ -23,16 +23,16 @@ export function Help() {
               <CardTitle className="text-white">Getting Started</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="text-sm text-slate-400 space-y-4">
+          <CardContent className="text-sm text-slate-300 space-y-4">
             <p>
               This MCP server provides a standardized interface for Microsoft
               OneNote operations via the Microsoft Graph API.
             </p>
             <p>Key concepts:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>OAuth2-based authorization flows</li>
-              <li>Notebook/Page graph traversal</li>
-              <li>FastMCP 2.14.4+ dual-transport bridge</li>
+              <li>OAuth2 device-code authorization flows</li>
+              <li>Notebook/Section/Page graph traversal</li>
+              <li>FastMCP 3.4+ dual-transport bridge (stdio + HTTP)</li>
             </ul>
           </CardContent>
         </Card>
@@ -44,17 +44,16 @@ export function Help() {
               <CardTitle className="text-white">Developer Standards</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="text-sm text-slate-400 space-y-4">
+          <CardContent className="text-sm text-slate-300 space-y-4">
             <p>
-              Follow the
-              [AGENT_PROTOCOLS.md](file:///D:/Dev/repos/mcp-central-docs/standards/AGENT_PROTOCOLS.md)
-              for all modifications. Ensure all new tools follow the portmanteau
-              pattern.
+              Follow the fleet standards in mcp-central-docs/standards for all
+              modifications. Tools use verb-led snake_case names with
+              Annotated+Field parameters and SOTA docstrings.
             </p>
             <div className="p-3 bg-slate-900 rounded border border-slate-800 font-mono text-xs">
-              <p># Always check port adjacency</p>
-              <p>WEB_PORT = 10894</p>
-              <p>BACKEND_PORT = 10895</p>
+              <p># Ports (registered in WEBAPP_PORTS.md)</p>
+              <p>BACKEND_PORT = 10907</p>
+              <p>FRONTEND_PORT = 10906</p>
             </div>
           </CardContent>
         </Card>
@@ -68,23 +67,21 @@ export function Help() {
           </div>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm text-left text-slate-400">
+          <table className="w-full text-sm text-left text-slate-300">
             <tbody className="divide-y divide-slate-800">
               <tr>
-                <td className="py-2 font-medium text-slate-300">
+                <td className="py-2 font-medium text-slate-200">
                   FastMCP Version
                 </td>
-                <td className="py-2 font-mono">2.14.4</td>
+                <td className="py-2 font-mono">3.4.4+</td>
               </tr>
               <tr>
-                <td className="py-2 font-medium text-slate-300">
-                  Template Mode
-                </td>
-                <td className="py-2">SOTA v2.0 (Feb 2026)</td>
+                <td className="py-2 font-medium text-slate-200">Transport</td>
+                <td className="py-2">stdio + HTTP streamable (/mcp)</td>
               </tr>
               <tr>
-                <td className="py-2 font-medium text-slate-300">Locale</td>
-                <td className="py-2">Vienna (Alsergrund)</td>
+                <td className="py-2 font-medium text-slate-200">Backend API</td>
+                <td className="py-2">http://127.0.0.1:10907/api/*</td>
               </tr>
             </tbody>
           </table>

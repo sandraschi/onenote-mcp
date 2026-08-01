@@ -21,7 +21,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `ONENOTE_LOG_LEVEL` | info | uvicorn log level |
 | `MCP_BRIDGE_URLS` | - | Comma-separated remote MCP URLs proxied via create_proxy |
 
-## MCP tools (12)
+## MCP tools (13)
 
 | Tool | Purpose |
 |------|---------|
@@ -35,6 +35,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `onenote_create_page` | Create a page with HTML body |
 | `onenote_search_pages` | Full-text search across notebooks |
 | `onenote_get_notebook_toc` | Sections + pages overview |
+| `show_notebooks_card` | Notebooks as an in-chat Prefab card |
 | `onenote_help` | Tool list and usage notes |
 | `shutdown_server` | Graceful server termination |
 
@@ -48,8 +49,9 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 - `POST /api/auth/device`, `GET /api/auth/poll`, `GET /api/auth/status` — device-code auth UI
 - `GET /api/notebooks`, `GET /api/notebooks/{id}/toc` — notebook browser
 - `GET /api/pages/{id}`, `POST /api/pages`, `GET /api/search?q=` — page content/creation/search
-- `GET /api/skills` — skills list (empty until skills ship)
-- `GET /api/llm/discover` — Ollama detection (`ollama_detected`, `configured_model`)
+- `GET /api/skills`, `GET /api/skills/{name}` — skills list + SKILL.md content
+- `GET /api/fleet/apps` — Apps Hub registry (adjacent fleet webapps)
+- `GET /api/llm/discover` — local LLM probe (Ollama :11434, LM Studio :1234, vLLM :8000; `providers[].models`)
 - `POST /api/shutdown` — graceful shutdown (agent-requested)
 
 ## Architecture
