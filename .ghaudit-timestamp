@@ -1,0 +1,9 @@
+{
+  "low": 0,
+  "medium": 2,
+  "ci_pass": false,
+  "repo": "onenote-mcp",
+  "high": 3,
+  "timestamp": "2026-08-01T22:46:53.9752523+02:00",
+  "last_release": null
+}
