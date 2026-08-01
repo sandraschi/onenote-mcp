@@ -266,6 +266,19 @@ async def health_check(request: Request) -> JSONResponse:
     return JSONResponse({"status": "healthy", "server": "onenote-mcp"})
 
 
+@app.custom_route("/api/v1/health", methods=["GET"])
+async def api_v1_health(request: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "status": "ok",
+            "server": "onenote-mcp",
+            "version": _SERVER_VERSION,
+            "uptime_seconds": int(time.monotonic() - _START_TIME),
+            "tool_count": _tool_count(),
+        }
+    )
+
+
 # ---- Webapp REST API (fleet SOTA endpoints) ----
 
 _TAGGED_SKILLS: list[dict[str, str]] = []

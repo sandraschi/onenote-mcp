@@ -36,6 +36,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "lxml>=4.9.0",
     "prefab-ui>=0.14.0",
+    "fastapi>=0.115.0",
 ]
 
 [project.optional-dependencies]
@@ -100,6 +101,14 @@ ignore = ["S101", "B008", "S105", "S106", "S110", "S112", "S101", "B008", "S105"
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.21.0",
+    "ruff>=0.16.0,<0.17",
+    "mypy>=1.10.0",
+    "pre-commit>=4.6.1",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/cua-smoke.py" = ["S310"]
