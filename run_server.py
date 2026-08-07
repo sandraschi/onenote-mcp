@@ -13,6 +13,13 @@ else:
 if str(base / "src") not in sys.path:
     sys.path.insert(0, str(base / "src"))
 
+# Eager imports for the frozen build (TAURI_PRODUCTION_PITFALLS.md §E):
+# stdlib C extensions + the mcp bootstrap before fastmcp touches it.
+import _datetime  # noqa: F401
+import _strptime  # noqa: F401
+
+import mcp.types  # noqa: F401
+
 os.environ.setdefault("MCP_TRANSPORT", "http")
 
 if __name__ == "__main__":

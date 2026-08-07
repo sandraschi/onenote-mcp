@@ -117,3 +117,4 @@ test = [
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/cua-smoke.py" = ["S310"]
+"scripts/cua-webapp-test.py" = ["S310", "B007"]

@@ -8,7 +8,7 @@ pkg_name = "onenote_mcp"
 datas = [(f"src/onenote_mcp", "onenote_mcp")]
 for pkg in (
     "fastmcp",
-    "fastapi",
+    "mcp",
     "uvicorn",
     "pydantic",
     "starlette",
@@ -26,6 +26,11 @@ hiddenimports = [
     "uvicorn.protocols.http.h11_impl",
     "uvicorn.lifespan",
     "uvicorn.lifespan.on",
+    "_strptime",
+    "_datetime",
+    "joserfc",
+    "joserfc.jwk",
+    "joserfc.jwt",
 ]
 
 a = Analysis(

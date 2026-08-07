@@ -18,11 +18,9 @@ os.environ.setdefault("MCP_TRANSPORT", "http")
 if __name__ == "__main__":
     import uvicorn
 
-    # Fleet standard (CORS_STANDARD.md): serve the CORS-wrapped mcp.http_app()
-    # directly. The FastMCP app carries the custom routes at root (/health,
-    # /api/*) and the streamable HTTP transport at /mcp - no FastAPI shell
-    # wrapper needed (a shell mounting http_app under /mcp would drop the REST
-    # surface and break the webapp).
+    # Fleet standard: serve the CORS-wrapped mcp.http_app() directly.
+    # The FastMCP app carries the custom routes at root (/health, /api/*) and
+    # the streamable HTTP transport at /mcp - no FastAPI shell wrapper needed.
     from onenote_mcp.server import http_app
 
     host = os.environ.get("ONENOTE_HOST", "127.0.0.1")
