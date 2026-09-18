@@ -20,18 +20,11 @@ bootstrap:
 
 # Execute Ruff SOTA v13.1 linting
 lint:
-    Set-Location '{{justfile_directory()}}'
-    uv run ruff check .
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npx @biomejs/biome ci .
+    Set-Location '{{justfile_directory()}}'; uv run ruff check .; Set-Location '{{justfile_directory()}}\web_sota'; npx @biomejs/biome ci .
 
 # Execute Ruff SOTA v13.1 fix and formatting
 fix:
-    Set-Location '{{justfile_directory()}}'
-    uv run ruff check . --fix --unsafe-fixes
-    uv run ruff format .
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npx @biomejs/biome check --write .
+    Set-Location '{{justfile_directory()}}'; uv run ruff check . --fix --unsafe-fixes; uv run ruff format .; Set-Location '{{justfile_directory()}}\web_sota'; npx @biomejs/biome check --write .
 
 # -----------------------------------------------------------------------------
 # Hardening
@@ -65,24 +58,15 @@ fmt:
 
 # Playwright e2e (webapp)
 e2e:
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npx playwright test
+    Set-Location '{{justfile_directory()}}\web_sota'; npx playwright test
 
 # Build the Tauri NSIS desktop installer
 build-native:
-    Set-Location '{{justfile_directory()}}\native'
-    $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-    .\build.ps1
+    Set-Location '{{justfile_directory()}}\native'; $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"; .\build.ps1
 
 # All gates green: lint + format + tests + tsc + biome
 gates-green:
-    Set-Location '{{justfile_directory()}}'
-    uv run ruff check src/ tests/
-    uv run ruff format src/ tests/ --check
-    uv run pytest tests/ -q
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npx tsc -b
-    npx @biomejs/biome ci .
+    Set-Location '{{justfile_directory()}}'; uv run ruff check src/ tests/; uv run ruff format src/ tests/ --check; uv run pytest tests/ -q; Set-Location '{{justfile_directory()}}\web_sota'; npx tsc -b; npx @biomejs/biome ci .
 
 
 # Bootstrap: install dev deps + pre-commit hook
