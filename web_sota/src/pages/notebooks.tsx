@@ -158,7 +158,11 @@ export function Notebooks() {
         throw new Error(data.error || "Failed to load notebooks");
       setNotebooks(data.notebooks || []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      // A 401 means the stored token is dead even if /auth/status saw a
+      // token file - surface the re-auth banner instead of hiding it.
+      if (/401|unauthorized/i.test(msg)) setAuthOk(false);
     } finally {
       setLoading(false);
     }
