@@ -20,7 +20,7 @@ from prefab_ui.components import Heading, Row, Text
 from pydantic import Field
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse
 
 from .constants import AUTHORITY, CLIENT_ID, SCOPES, TOKEN_FILE_NAME
 from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
@@ -701,6 +701,69 @@ async def api_auth_poll(request: Request) -> JSONResponse:
 async def api_auth_status(request: Request) -> JSONResponse:
     token = load_access_token()
     return JSONResponse({"authenticated": bool(token)})
+
+
+# ---- Browser redirect login (auth-code flow) ----
+# Device-code flow yields MSA tokens the OneNote workload rejects (40001);
+# the browser redirect flow (same kind Graph Explorer uses) yields working
+# tokens. Requires the app registration to allow the localhost redirect
+# (portal: Authentication -> Mobile and desktop applications -> http://localhost).
+
+_auth_code_flows: dict[str, dict[str, Any]] = {}
+
+REDIRECT_URI = os.environ.get("ONENOTE_REDIRECT_URI", "http://localhost:10907/api/auth/callback")
+
+
+@app.custom_route("/api/auth/login", methods=["GET"])
+async def api_auth_login(request: Request) -> JSONResponse:
+    """Start browser login. Returns auth_uri for the user to open."""
+    now = time.time()
+    for state in [s for s, e in _auth_code_flows.items() if now - e["started"] > 600]:
+        _auth_code_flows.pop(state, None)
+    app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
+    flow = app.initiate_auth_code_flow(SCOPES, redirect_uri=REDIRECT_URI)
+    if "auth_uri" not in flow:
+        err = flow.get("error_description", flow.get("error", "unknown"))
+        _log.error("auth", f"browser login start failed: {err}")
+        return JSONResponse({"success": False, "error": err}, status_code=500)
+    _auth_code_flows[flow["state"]] = {"flow": flow, "started": now}
+    _log.info("auth", "browser login started")
+    return JSONResponse({"success": True, "auth_uri": flow["auth_uri"]})
+
+
+def _auth_page(title: str, message: str, ok: bool) -> "HTMLResponse":
+    import html as _html
+
+    color = "#34d399" if ok else "#f87171"
+    body = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>{_html.escape(title)}</title></head>
+<body style="background:#020617;color:#e2e8f0;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="text-align:center"><h2 style="color:{color}">{_html.escape(title)}</h2><p>{_html.escape(message)}</p>
+<p style="color:#64748b">You can close this tab and return to the app.</p></div>
+<script>try{{if({str(ok).lower()})setTimeout(function(){{window.close()}},3000);}}catch(e){{}}</script>
+</body></html>"""
+    return HTMLResponse(body, status_code=200 if ok else 400)
+
+
+@app.custom_route("/api/auth/callback", methods=["GET"])
+async def api_auth_callback(request: Request) -> "HTMLResponse":
+    """Microsoft redirects here after browser login. Exchanges the code."""
+    params = dict(request.query_params)
+    if "error" in params:
+        _log.error("auth", f"browser login refused: {params.get('error_description', params['error'])}")
+        return _auth_page("Sign-in refused", params.get("error_description", params["error"]), ok=False)
+    entry = _auth_code_flows.pop(params.get("state", ""), None)
+    if not entry:
+        return _auth_page("Login expired", "No matching login session - start sign-in again.", ok=False)
+    app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
+    result = app.acquire_token_by_authorization_code(params, entry["flow"])
+    if "access_token" in result:
+        save_access_token(result["access_token"])
+        account = result.get("id_token_claims", {}).get("preferred_username", "")
+        _log.info("auth", f"browser login authorized ({account})")
+        return _auth_page("Signed in", f"Connected as {account or 'your Microsoft account'}.", ok=True)
+    err = result.get("error_description", "Authorization failed")
+    _log.error("auth", f"browser login failed: {err}")
+    return _auth_page("Sign-in failed", err, ok=False)
 
 
 def _decode_jwt_claims(token: str) -> dict[str, Any] | None:

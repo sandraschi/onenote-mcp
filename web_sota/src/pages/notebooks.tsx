@@ -71,9 +71,7 @@ export function Notebooks() {
   const [notice, setNotice] = useState("");
   const [authOk, setAuthOk] = useState<boolean | null>(null);
   const [authFlow, setAuthFlow] = useState<{
-    flow_id: string;
-    user_code: string;
-    verification_uri: string;
+    auth_uri: string;
   } | null>(null);
   const authTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -100,44 +98,41 @@ export function Notebooks() {
   const startAuth = async () => {
     setError("");
     try {
+      // Browser redirect login (auth-code flow): device-code tokens are
+      // rejected by the OneNote workload for personal accounts.
       const data = await fetchJson<{
         success: boolean;
-        flow_id?: string;
-        user_code?: string;
-        verification_uri?: string;
+        auth_uri?: string;
         error?: string;
-      }>("/auth/device", { method: "POST" });
-      if (!data.success || !data.flow_id) {
-        setError(data.error || "Auth start failed");
+      }>("/auth/login");
+      if (!data.success || !data.auth_uri) {
+        setError(data.error || "Sign-in start failed");
         return;
       }
-      setAuthFlow({
-        flow_id: data.flow_id,
-        user_code: data.user_code || "",
-        verification_uri: data.verification_uri || "",
-      });
+      setAuthFlow({ auth_uri: data.auth_uri });
+      window.open(data.auth_uri, "_blank", "noopener");
+      let attempts = 0;
       authTimerRef.current = setInterval(async () => {
+        attempts += 1;
         try {
-          const poll = await fetchJson<{
-            status: string;
-            account?: string;
-            error?: string;
-          }>(`/auth/poll?flow_id=${data.flow_id}`);
-          if (poll.status === "authorized") {
+          const st = await fetchJson<{ authenticated: boolean }>(
+            "/auth/status",
+          );
+          if (st.authenticated === true) {
             stopAuthPolling();
             setAuthFlow(null);
             setAuthOk(true);
-            setNotice(
-              `Connected as ${poll.account || "your Microsoft account"}`,
-            );
+            setNotice("Connected to your Microsoft account");
             loadNotebooks();
-          } else if (poll.status === "error") {
-            stopAuthPolling();
-            setAuthFlow(null);
-            setError(poll.error || "Authentication failed");
+            return;
           }
         } catch {
           /* keep polling */
+        }
+        if (attempts >= 200) {
+          stopAuthPolling();
+          setAuthFlow(null);
+          setError("Sign-in timed out - try again");
         }
       }, 3000);
     } catch (e) {
@@ -341,31 +336,25 @@ export function Notebooks() {
               className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-3 py-1.5 shrink-0"
               onClick={startAuth}
             >
-              Connect Microsoft account
+              Sign in with Microsoft
             </button>
           ) : (
             <div className="text-right shrink-0 space-y-1">
               <p className="text-sm text-slate-300">
-                Open{" "}
+                A sign-in tab opened in your browser - approve access there,{" "}
                 <a
-                  href={authFlow.verification_uri}
+                  href={authFlow.auth_uri}
                   target="_blank"
                   rel="noreferrer"
                   className="text-blue-400 underline"
                 >
-                  {authFlow.verification_uri}
-                </a>{" "}
-                and enter code{" "}
-                <code
-                  data-testid="auth-user-code"
-                  className="font-mono text-white bg-slate-800 px-2 py-0.5 rounded"
-                >
-                  {authFlow.user_code}
-                </code>
+                  or click here to reopen it
+                </a>
+                .
               </p>
               <p className="text-sm text-slate-400 flex items-center justify-end gap-1.5">
                 <Loader2 className="h-3 w-3 animate-spin" /> Waiting for
-                authorization...
+                sign-in...
               </p>
             </div>
           )}
