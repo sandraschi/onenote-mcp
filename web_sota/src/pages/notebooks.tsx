@@ -298,7 +298,14 @@ export function Notebooks() {
             data-testid="notebook-create"
             className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-3 py-1.5"
             onClick={() => setShowCreate(true)}
-            disabled={!selectedNotebook}
+            disabled={!selectedNotebook || !authOk}
+            title={
+              !authOk
+                ? "Sign in with Microsoft first"
+                : !selectedNotebook
+                  ? "Select a notebook first"
+                  : "Create a new page"
+            }
           >
             <Plus className="h-4 w-4" /> New page
           </button>
