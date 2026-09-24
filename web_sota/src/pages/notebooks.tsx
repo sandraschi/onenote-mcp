@@ -274,7 +274,7 @@ export function Notebooks() {
           <h2 className="text-2xl font-bold tracking-tight text-white">
             OneNote Notebooks
           </h2>
-          <p className="text-slate-400">
+          <p className="text-slate-300">
             Browse notebooks, sections, and pages via Microsoft Graph
           </p>
         </div>
@@ -326,7 +326,7 @@ export function Notebooks() {
             <p className="text-sm text-amber-300 font-medium">
               OneNote not connected
             </p>
-            <p className="text-xs text-slate-400">
+            <p className="text-sm text-slate-300">
               Connect your Microsoft account to browse notebooks and pages.
             </p>
           </div>
@@ -341,7 +341,7 @@ export function Notebooks() {
             </button>
           ) : (
             <div className="text-right shrink-0 space-y-1">
-              <p className="text-xs text-slate-300">
+              <p className="text-sm text-slate-300">
                 Open{" "}
                 <a
                   href={authFlow.verification_uri}
@@ -359,7 +359,7 @@ export function Notebooks() {
                   {authFlow.user_code}
                 </code>
               </p>
-              <p className="text-xs text-slate-500 flex items-center justify-end gap-1.5">
+              <p className="text-sm text-slate-400 flex items-center justify-end gap-1.5">
                 <Loader2 className="h-3 w-3 animate-spin" /> Waiting for
                 authorization...
               </p>
@@ -377,7 +377,7 @@ export function Notebooks() {
             </p>
             <button
               type="button"
-              className="text-slate-500 hover:text-slate-300"
+              className="text-slate-400 hover:text-slate-200"
               onClick={() => {
                 setSearchResults(null);
                 setQuery("");
@@ -387,7 +387,7 @@ export function Notebooks() {
             </button>
           </div>
           {searchResults.length === 0 ? (
-            <p className="p-4 text-sm text-slate-500">No matching pages.</p>
+            <p className="p-4 text-sm text-slate-400">No matching pages.</p>
           ) : (
             <ul className="divide-y divide-slate-800/60">
               {searchResults.map((p) => (
@@ -401,7 +401,7 @@ export function Notebooks() {
                       <FileText className="h-3.5 w-3.5 inline mr-1.5 text-blue-400" />
                       {p.title || "(untitled)"}
                     </span>
-                    <span className="text-xs text-slate-500 shrink-0">
+                    <span className="text-xs text-slate-400 shrink-0">
                       {fmtDate(p.lastModifiedDateTime)}
                     </span>
                   </button>
@@ -415,15 +415,15 @@ export function Notebooks() {
       <div className="grid grid-cols-[280px_1fr] gap-4 min-h-[420px]">
         {/* Notebook + TOC tree */}
         <div className="rounded-lg border border-slate-800 bg-slate-950/50 overflow-hidden">
-          <p className="px-4 py-2 text-xs font-medium text-slate-500 border-b border-slate-800 flex items-center gap-1.5">
+          <p className="px-4 py-2 text-xs font-medium text-slate-400 border-b border-slate-800 flex items-center gap-1.5">
             <BookOpen className="h-3.5 w-3.5" /> Notebooks
           </p>
           {loading ? (
-            <div className="p-4 flex items-center gap-2 text-slate-500 text-sm">
+            <div className="p-4 flex items-center gap-2 text-slate-400 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading...
             </div>
           ) : notebooks.length === 0 ? (
-            <p className="p-4 text-sm text-slate-500">
+            <p className="p-4 text-sm text-slate-400">
               No notebooks found. Connect your Microsoft account first.
             </p>
           ) : (
@@ -448,21 +448,21 @@ export function Notebooks() {
             </ul>
           )}
           {tocLoading && (
-            <div className="p-4 flex items-center gap-2 text-slate-500 text-sm">
+            <div className="p-4 flex items-center gap-2 text-slate-400 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading sections...
             </div>
           )}
           {toc && !tocLoading && (
             <div className="max-h-[320px] overflow-y-auto">
-              <p className="px-4 py-1.5 text-xs text-slate-500 border-t border-slate-800">
+              <p className="px-4 py-1.5 text-xs text-slate-400 border-t border-slate-800">
                 {toc.stats.sections} sections · {toc.stats.pages} pages
               </p>
               {toc.sections.map((sec) => (
                 <div key={sec.name}>
-                  <p className="px-4 py-1.5 text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                  <p className="px-4 py-1.5 text-sm font-medium text-slate-300 flex items-center gap-1.5">
                     <FolderOpen className="h-3.5 w-3.5 text-blue-400" />
                     {sec.name}
-                    <span className="text-slate-600">({sec.pageCount})</span>
+                    <span className="text-slate-500">({sec.pageCount})</span>
                   </p>
                   {sec.pages.map((pg) => (
                     <button
@@ -476,7 +476,7 @@ export function Notebooks() {
                       }`}
                       onClick={() => openPage(pg.id)}
                     >
-                      <ChevronRight className="h-3 w-3 text-slate-600 shrink-0" />
+                      <ChevronRight className="h-3 w-3 text-slate-500 shrink-0" />
                       <span className="truncate">
                         {pg.title || "(untitled)"}
                       </span>
@@ -491,7 +491,7 @@ export function Notebooks() {
         {/* Page viewer */}
         <div className="rounded-lg border border-slate-800 bg-slate-950/50 overflow-hidden">
           {pageLoading ? (
-            <div className="flex items-center justify-center h-64 gap-2 text-slate-500">
+            <div className="flex items-center justify-center h-64 gap-2 text-slate-400">
               <Loader2 className="h-5 w-5 animate-spin" /> Loading page...
             </div>
           ) : selectedPage ? (
@@ -500,7 +500,7 @@ export function Notebooks() {
                 <h3 className="text-lg font-semibold text-white">
                   {selectedPage.title || "(untitled)"}
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-slate-400">
                   Modified {fmtDate(selectedPage.lastModifiedDateTime)}
                 </p>
               </div>
@@ -511,7 +511,7 @@ export function Notebooks() {
               />
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-600 gap-2">
+            <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-2">
               <FileText className="h-8 w-8" />
               <p className="text-sm">Select a page to view it</p>
             </div>
@@ -529,7 +529,7 @@ export function Notebooks() {
               <h3 className="text-white font-semibold">New page</h3>
               <button
                 type="button"
-                className="text-slate-500 hover:text-slate-300"
+                className="text-slate-400 hover:text-slate-200"
                 onClick={() => setShowCreate(false)}
               >
                 <X className="h-4 w-4" />

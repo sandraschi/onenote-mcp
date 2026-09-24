@@ -16,7 +16,10 @@ export function Help() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border-slate-800 bg-slate-950/50">
+        <Card
+          className="border-slate-800 bg-slate-950/50"
+          data-testid="help-getting-started"
+        >
           <CardHeader>
             <div className="flex items-center gap-2">
               <Book className="h-5 w-5 text-emerald-500" />
@@ -37,7 +40,10 @@ export function Help() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-950/50">
+        <Card
+          className="border-slate-800 bg-slate-950/50"
+          data-testid="help-standards"
+        >
           <CardHeader>
             <div className="flex items-center gap-2">
               <Code className="h-5 w-5 text-blue-500" />
@@ -59,7 +65,10 @@ export function Help() {
         </Card>
       </div>
 
-      <Card className="border-slate-800 bg-slate-950/50">
+      <Card
+        className="border-slate-800 bg-slate-950/50"
+        data-testid="help-sysinfo"
+      >
         <CardHeader>
           <div className="flex items-center gap-2">
             <Info className="h-5 w-5 text-purple-500" />

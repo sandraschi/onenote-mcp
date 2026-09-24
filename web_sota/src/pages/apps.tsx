@@ -51,7 +51,10 @@ export function Apps() {
         </p>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+        data-testid="apps-grid"
+      >
         {apps.map((app) => (
           <Card
             key={app.name}
@@ -83,7 +86,7 @@ export function Apps() {
           <h3 className="text-lg font-medium text-slate-300">
             {apps.length > 0 ? "Fleet apps loaded" : "Fleet discovery"}
           </h3>
-          <p className="text-sm text-slate-400 max-w-sm">
+          <p className="text-sm text-slate-300 max-w-sm">
             App list is served by the backend registry endpoint - ports are
             never hardcoded in the frontend.
           </p>
