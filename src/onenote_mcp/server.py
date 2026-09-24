@@ -260,7 +260,7 @@ async def get_notebook_toc(notebook_id: str) -> TOCData:
 # Create FastMCP app
 app = FastMCP(name="onenote-mcp", instructions="Microsoft OneNote integration via Model Context Protocol")
 
-# Tool annotations (TOOL_DESIGN_STANDARDS.md §9 — dict format, FastMCP 3.x)
+# Tool annotations (TOOL_DESIGN_STANDARDS.md §9 - dict format, FastMCP 3.x)
 _READONLY = {"readonly": True}
 _MUTATING = {}
 
@@ -356,8 +356,8 @@ async def api_capabilities(request: Request) -> JSONResponse:
                 "search": True,
                 "toc": True,
                 "auth": True,
-                "chat": False,
-                "skills": False,
+                "chat": True,
+                "skills": True,
             },
             "tools": [t["name"] for t in _list_mcp_tools()],
         }
@@ -383,14 +383,23 @@ async def api_skill_content(request: Request) -> JSONResponse:
     return JSONResponse({"success": False, "error": "skill not found"}, status_code=404)
 
 
-@app.custom_route("/api/llm/discover", methods=["GET"])
-async def api_llm_discover(request: Request) -> JSONResponse:
+# Local LLM providers probed by /api/llm/* (kind: native ollama vs OpenAI-compatible).
+_LLM_PROVIDERS: dict[str, dict[str, Any]] = {
+    "ollama": {"port": 11434, "kind": "ollama", "models_path": "/api/tags"},
+    "lm_studio": {"port": 1234, "kind": "openai", "models_path": "/v1/models"},
+    "vllm": {"port": 8000, "kind": "openai", "models_path": "/v1/models"},
+}
+
+
+async def _probe_llm_providers() -> dict[str, dict[str, Any]]:
+    """Probe local LLM providers; shared by discover/providers/models/onboarding."""
     providers: dict[str, dict[str, Any]] = {}
 
-    async def _probe(name: str, port: int, model_path: str) -> None:
+    async def _probe(name: str) -> None:
+        port = _LLM_PROVIDERS[name]["port"]
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
-                r = await client.get(f"http://127.0.0.1:{port}{model_path}")
+                r = await client.get(f"http://127.0.0.1:{port}{_LLM_PROVIDERS[name]['models_path']}")
                 if r.status_code != 200:
                     providers[name] = {"detected": False, "port": port, "models": []}
                     return
@@ -403,11 +412,13 @@ async def api_llm_discover(request: Request) -> JSONResponse:
         except Exception:
             providers[name] = {"detected": False, "port": port, "models": []}
 
-    await asyncio.gather(
-        _probe("ollama", 11434, "/api/tags"),
-        _probe("lm_studio", 1234, "/v1/models"),
-        _probe("vllm", 8000, "/v1/models"),
-    )
+    await asyncio.gather(*(_probe(name) for name in _LLM_PROVIDERS))
+    return providers
+
+
+@app.custom_route("/api/llm/discover", methods=["GET"])
+async def api_llm_discover(request: Request) -> JSONResponse:
+    providers = await _probe_llm_providers()
 
     ollama = providers.get("ollama", {})
     configured_model = (ollama.get("models") or [""])[0]
@@ -418,6 +429,112 @@ async def api_llm_discover(request: Request) -> JSONResponse:
             "providers": providers,
         }
     )
+
+
+@app.custom_route("/api/llm/providers", methods=["GET"])
+async def api_llm_providers(request: Request) -> JSONResponse:
+    """Provider registry: local detected flags + model lists (never key bytes)."""
+    providers = await _probe_llm_providers()
+    return JSONResponse(
+        {
+            "providers": [
+                {
+                    "name": name,
+                    "detected": info.get("detected", False),
+                    "port": info.get("port"),
+                    "models": info.get("models", []),
+                }
+                for name, info in providers.items()
+            ]
+        }
+    )
+
+
+@app.custom_route("/api/llm/models", methods=["GET"])
+async def api_llm_models(request: Request) -> JSONResponse:
+    """Model list for one provider (?provider=ollama); live when reachable."""
+    name = request.query_params.get("provider", "ollama")
+    if name not in _LLM_PROVIDERS:
+        return JSONResponse(
+            {"success": False, "error": f"unknown provider '{name}'"},
+            status_code=404,
+        )
+    providers = await _probe_llm_providers()
+    info = providers.get(name, {})
+    return JSONResponse({"provider": name, "models": info.get("models", [])})
+
+
+@app.custom_route("/api/llm/onboarding", methods=["GET"])
+async def api_llm_onboarding(request: Request) -> JSONResponse:
+    """Fresh-install starter facts + recommended path for the under-hero cue."""
+    providers = await _probe_llm_providers()
+    any_live = any(info.get("detected") for info in providers.values())
+    first_model = ""
+    for info in providers.values():
+        if info.get("detected") and info.get("models"):
+            first_model = info["models"][0]
+            break
+    return JSONResponse(
+        {
+            "local_llm_available": any_live,
+            "recommended_model": first_model,
+            "facts": [
+                "Chat runs through a backend proxy - keys and provider URLs never leave this server.",
+                "Install Ollama (port 11434) or LM Studio (port 1234) for free local chat.",
+                "Pick the provider + model on the Settings page; Chat uses it automatically.",
+            ],
+            "recommended_path": (
+                "open Settings, confirm a detected provider, then use Chat"
+                if any_live
+                else "install Ollama from https://ollama.com, pull a model, then return to Chat"
+            ),
+        }
+    )
+
+
+@app.custom_route("/api/llm/chat", methods=["POST"])
+async def api_llm_chat(request: Request) -> JSONResponse:
+    """Backend chat proxy (the ONLY path Chat uses) - keys never leave the server."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "invalid JSON body"}, status_code=400)
+    provider = str(body.get("provider") or "ollama")
+    model = str(body.get("model") or "")
+    messages = body.get("messages") or []
+    if provider not in _LLM_PROVIDERS:
+        return JSONResponse({"success": False, "error": f"unknown provider '{provider}'"}, status_code=404)
+    if not model or not isinstance(messages, list) or not messages:
+        return JSONResponse(
+            {"success": False, "error": "model (str) and messages (non-empty list) required"},
+            status_code=400,
+        )
+    kind = _LLM_PROVIDERS[provider]["kind"]
+    port = _LLM_PROVIDERS[provider]["port"]
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            if kind == "ollama":
+                r = await client.post(
+                    f"http://127.0.0.1:{port}/api/chat",
+                    json={"model": model, "messages": messages, "stream": False},
+                )
+            else:  # OpenAI-compatible (LM Studio, vLLM)
+                r = await client.post(
+                    f"http://127.0.0.1:{port}/v1/chat/completions",
+                    json={"model": model, "messages": messages, "stream": False},
+                )
+        if r.status_code != 200:
+            return JSONResponse({"success": False, "error": f"provider HTTP {r.status_code}"}, status_code=502)
+        data = r.json()
+        if kind == "ollama":
+            content = (data.get("message") or {}).get("content", "")
+        else:
+            choices = data.get("choices") or []
+            content = ((choices[0].get("message") if choices else {}) or {}).get("content", "")
+        return JSONResponse({"success": True, "content": content})
+    except Exception as exc:
+        logger.exception("LLM proxy error: %s", exc)
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=502)
 
 
 @app.custom_route("/api/v1/diagnostics", methods=["GET"])
@@ -644,7 +761,7 @@ async def api_create_page(request: Request) -> JSONResponse:
         return _error_response(exc)
 
 
-# MCP Bridge — proxy remote MCP servers via ProxyProvider
+# MCP Bridge - proxy remote MCP servers via ProxyProvider
 MCP_BRIDGE_URLS = os.environ.get("MCP_BRIDGE_URLS", "")
 if MCP_BRIDGE_URLS:
     for url in MCP_BRIDGE_URLS.split(","):
@@ -661,8 +778,11 @@ async def authenticate() -> str:
     The user will be provided with a URL and code to complete authentication
     in their browser.
 
-    Returns:
-        Success message or error details
+    ## Return Format
+    Confirmation string: "✅ Authentication successful" or "❌ ..." on failure.
+
+    ## Examples
+    authenticate()
     """
     try:
         result = await authenticate_device_code()
@@ -683,7 +803,7 @@ async def onenote_save_access_token(
     A confirmation string: "✅ Access token saved successfully" or "❌ ..." on failure.
 
     ## Examples
-    save_access_token(token="eyJhbGciOi...")  # paste a token from az login / Graph explorer
+    onenote_save_access_token(token="eyJhbGciOi...")  # paste a token from az login / Graph explorer
     """
     try:
         save_access_token(token)
@@ -700,7 +820,7 @@ async def onenote_list_notebooks() -> str:
     Markdown string: "📓 Your OneNote Notebooks:" followed by numbered notebooks with ID.
 
     ## Examples
-    list_notebooks()
+    onenote_list_notebooks()
     """
     try:
         notebooks = await list_notebooks()
@@ -727,7 +847,7 @@ async def onenote_get_notebook(
     Markdown string with notebook name, ID, sections URL, and section groups URL.
 
     ## Examples
-    get_notebook(notebook_id="0-ABC123...")
+    onenote_get_notebook(notebook_id="0-ABC123...")
     """
     try:
         notebook = await get_notebook(notebook_id)
@@ -750,7 +870,7 @@ async def onenote_list_sections(notebook_id: Annotated[str, Field(description="T
     Markdown string: "📂 Sections in notebook:" with numbered sections and their page URLs.
 
     ## Examples
-    list_sections(notebook_id="0-ABC123...")
+    onenote_list_sections(notebook_id="0-ABC123...")
     """
     try:
         sections = await list_sections(notebook_id)
@@ -776,7 +896,7 @@ async def onenote_list_pages(section_id: Annotated[str, Field(description="The I
     Markdown string: "📄 Pages in section:" with numbered pages, created and modified dates.
 
     ## Examples
-    list_pages(section_id="0-SEC123...")
+    onenote_list_pages(section_id="0-SEC123...")
     """
     try:
         pages = await list_pages(section_id)
@@ -805,7 +925,7 @@ async def onenote_get_page(page_id: Annotated[str, Field(description="The ID of 
     Markdown string: "📄 Page Content:" with title, ID, timestamps, and the raw HTML body.
 
     ## Examples
-    get_page(page_id="0-PG123...")
+    onenote_get_page(page_id="0-PG123...")
     """
     try:
         page = await get_page(page_id)
@@ -849,7 +969,7 @@ async def onenote_create_page(
     Confirmation string: "✅ Page '<title>' created successfully with ID: `<id>`".
 
     ## Examples
-    create_page(notebook_id="0-ABC123...", title="Meeting Notes", content="<h1>Notes</h1><p>...</p>")
+    onenote_create_page(notebook_id="0-ABC123...", title="Meeting Notes", content="<h1>Notes</h1><p>...</p>")
     """
     try:
         result = await create_page(notebook_id, title, content)
@@ -867,7 +987,7 @@ async def onenote_search_pages(query: Annotated[str, Field(description="Search q
     Markdown string: "🔍 Search Results for '<query>':" with numbered matching pages.
 
     ## Examples
-    search_pages(query="quarterly report")
+    onenote_search_pages(query="quarterly report")
     """
     try:
         pages = await search_pages(query)
@@ -896,7 +1016,7 @@ async def onenote_get_notebook_toc(notebook_id: Annotated[str, Field(description
     Markdown string: "📚 Table of Contents: <notebook>" with stats and per-section page lists.
 
     ## Examples
-    get_notebook_toc(notebook_id="0-ABC123...")
+    onenote_get_notebook_toc(notebook_id="0-ABC123...")
     """
     try:
         toc = await get_notebook_toc(notebook_id)
@@ -955,15 +1075,15 @@ async def onenote_help() -> str:
     """
     return """📚 **OneNote MCP tools:**
 - `authenticate` - start Microsoft device-code login
-- `save_access_token` - store a Graph token manually
-- `list_notebooks` - all notebooks
-- `get_notebook` - notebook details
-- `list_sections` - sections of a notebook
-- `list_pages` - pages of a section
-- `get_page` - full HTML content of a page
-- `create_page` - add a page with HTML body
-- `search_pages` - full-text search across notebooks
-- `get_notebook_toc` - sections + pages overview
+- `onenote_save_access_token` - store a Graph token manually
+- `onenote_list_notebooks` - all notebooks
+- `onenote_get_notebook` - notebook details
+- `onenote_list_sections` - sections of a notebook
+- `onenote_list_pages` - pages of a section
+- `onenote_get_page` - full HTML content of a page
+- `onenote_create_page` - add a page with HTML body
+- `onenote_search_pages` - full-text search across notebooks
+- `onenote_get_notebook_toc` - sections + pages overview
 - `show_notebooks_card` - notebooks as an in-chat Prefab card
 - `shutdown_server` - stop the server"""
 
@@ -992,6 +1112,28 @@ async def show_notebooks_card() -> ToolResult:
         for notebook in notebooks:
             Row(children=[Text(notebook.displayName), Text(notebook.id)])
     return ToolResult(content=lines, structured_content=card)
+
+
+@app.prompt()
+def onenote_triage() -> str:
+    """Guided triage prompt: find the right notebook, section, or page.
+
+    ## Return Format
+    Markdown prompt text steering discovery-first navigation.
+
+    ## Examples
+    onenote_triage()
+    """
+    return (
+        "Help the user triage their OneNote request. First decide the intent: "
+        "DISCOVER (list notebooks with onenote_list_notebooks, then drill with "
+        "onenote_list_sections / onenote_list_pages), RETRIEVE (search with "
+        "onenote_search_pages, then read hits with onenote_get_page), MAP "
+        "(onenote_get_notebook_toc for a structural overview), or CAPTURE "
+        "(onenote_create_page with semantic HTML). Ask one short clarifying "
+        "question when the target notebook is ambiguous; otherwise proceed and "
+        "show stable IDs at every step so follow-up calls can address items."
+    )
 
 
 @app.resource("skill://onenote")

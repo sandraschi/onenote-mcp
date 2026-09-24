@@ -1,6 +1,6 @@
 [project]
 name = "onenote-mcp"
-version = "1.0.2"
+version = "1.0.3"
 description = "FastMCP 3.1.0+ server for Microsoft OneNote integration"
 readme = "README.md"
 license = { text = "MIT" }
@@ -80,7 +80,7 @@ testpaths = ["tests"]
 [tool.mcpb]
 name = "onenote-mcp"
 description = "FastMCP server for Microsoft OneNote integration"
-version = "1.0.2"
+version = "1.0.3"
 
 [tool.mcpb.server]
 command = "python"
@@ -94,8 +94,8 @@ line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "S", "UP", "RUF"]
-ignore = ["S101", "B008", "S105", "S106", "S110", "S112", "S101", "B008", "S105", "S106", "S110", "S112", "RUF012", "S603", "S607", "S324", "E402", "E501"]
+select = ["E", "F", "W", "I", "B", "S", "UP", "RUF", "T20"]
+ignore = ["S101", "B008", "S105", "S106", "S101", "B008", "S105", "S106", "RUF012", "S603", "S607", "S324", "E402", "E501"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -118,3 +118,9 @@ test = [
 [tool.ruff.lint.per-file-ignores]
 "scripts/cua-smoke.py" = ["S310"]
 "scripts/cua-webapp-test.py" = ["S310", "B007"]
+# T20 (no print): CLI/demo/test/CUA scripts may print; server code may not.
+"example_usage.py" = ["T20"]
+"onenote_text_extractor.py" = ["T20"]
+"tests/**" = ["T20"]
+"scripts/**" = ["T20", "S110", "S112"]
+"mcpb/**" = ["T20", "S110", "S112"]

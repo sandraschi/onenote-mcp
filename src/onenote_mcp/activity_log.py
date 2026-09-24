@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from collections import deque
 from typing import Any
+
+logger = logging.getLogger("onenote_mcp.activity_log")
 
 
 class ActivityLog:
@@ -55,7 +58,7 @@ class ActivityLog:
                 at = float(after_id.split(".")[0])
                 entries = [e for e in entries if float(e["id"].split(".")[0]) > at]
             except (TypeError, ValueError):
-                pass
+                logger.warning("Ignoring malformed after_id=%r; returning unfiltered entries", after_id)
         if level:
             levels = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3}
             min_level = levels.get(level.upper(), 1)
