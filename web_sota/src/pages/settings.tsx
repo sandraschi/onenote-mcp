@@ -10,20 +10,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_BASE } from "../lib/api";
+import { PROVIDER_ORDER, useLlmStore } from "../store/llm";
 
-interface ProviderInfo {
-  detected: boolean;
-  port: number;
-  models: string[];
-}
-
-interface DiscoverPayload {
-  ollama_detected?: boolean;
-  configured_model?: string;
-  providers: Record<string, ProviderInfo>;
-}
-
-const PROVIDER_ORDER = ["ollama", "lm_studio", "vllm"];
 const PROVIDER_LABELS: Record<string, string> = {
   ollama: "Ollama",
   lm_studio: "LM Studio",
@@ -31,60 +19,17 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 function LLMSettings() {
-  const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
-  const [selectedProvider, setSelectedProvider] = useState("ollama");
-  const [selectedModel, setSelectedModel] = useState("");
-  const [detecting, setDetecting] = useState(true);
+  const { providers, provider, model, detecting, refresh, select } =
+    useLlmStore();
   useEffect(() => {
-    let cancelled = false;
-    fetch(`${API_BASE}/llm/discover`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((d: DiscoverPayload) => {
-        if (cancelled) return;
-        const detected = PROVIDER_ORDER.filter(
-          (p) => d.providers?.[p]?.detected,
-        );
-        if (detected.length === 0) {
-          setProviders(d.providers ?? {});
-          setSelectedProvider("");
-          setSelectedModel("");
-          setDetecting(false);
-          return;
-        }
-        const savedP = localStorage.getItem("llm_provider");
-        const first = detected.includes(savedP ?? "") ? savedP! : detected[0];
-        setProviders(d.providers);
-        setSelectedProvider(first);
-        const savedM = localStorage.getItem("llm_model") ?? "";
-        const models = d.providers[first]?.models ?? [];
-        setSelectedModel(models.includes(savedM) ? savedM : (models[0] ?? ""));
-        setDetecting(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setProviders({});
-          setSelectedProvider("");
-          setSelectedModel("");
-          setDetecting(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  const save = (p: string, m: string) => {
-    localStorage.setItem("llm_provider", p);
-    localStorage.setItem("llm_model", m);
-  };
-  const models = selectedProvider
-    ? (providers[selectedProvider]?.models ?? [])
-    : [];
+    refresh();
+  }, [refresh]);
+  const models = provider ? (providers[provider]?.models ?? []) : [];
   const detectedProviders = PROVIDER_ORDER.filter(
     (p) => providers[p]?.detected,
   );
+  const selectedProvider = provider;
+  const selectedModel = model;
   return (
     <Card className="border-slate-800 bg-slate-950/50">
       <CardHeader>
@@ -120,10 +65,8 @@ function LLMSettings() {
           disabled={detectedProviders.length === 0}
           onChange={(e) => {
             const p = e.target.value;
-            setSelectedProvider(p);
             const modelsFor = providers[p]?.models ?? [];
-            setSelectedModel(modelsFor[0] ?? "");
-            save(p, modelsFor[0] ?? "");
+            select(p, modelsFor[0] ?? "");
           }}
         >
           {detectedProviders.length === 0 && (
@@ -141,8 +84,7 @@ function LLMSettings() {
           value={selectedModel}
           disabled={models.length === 0}
           onChange={(e) => {
-            setSelectedModel(e.target.value);
-            save(selectedProvider, e.target.value);
+            select(selectedProvider, e.target.value);
           }}
         >
           {models.length === 0 && <option value="">No models available</option>}
@@ -158,6 +100,24 @@ function LLMSettings() {
 }
 
 export function Settings() {
+  const [probe, setProbe] = useState<string | null>(null);
+  const [probing, setProbing] = useState(false);
+  const testConnection = async () => {
+    setProbing(true);
+    setProbe(null);
+    try {
+      const r = await fetch(`${API_BASE}/status`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = (await r.json()) as { version?: string; tool_count?: number };
+      setProbe(
+        `Connected - v${d.version ?? "?"} - ${d.tool_count ?? "?"} tools`,
+      );
+    } catch (e) {
+      setProbe(e instanceof Error ? `Failed: ${e.message}` : "Failed");
+    } finally {
+      setProbing(false);
+    }
+  };
   return (
     <div className="space-y-6" data-testid="settings-page">
       <div>
@@ -173,7 +133,7 @@ export function Settings() {
             <CardTitle className="text-white">
               API Bridge Configuration
             </CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardDescription className="text-slate-300">
               Connection details for the backend server
             </CardDescription>
           </CardHeader>
@@ -181,40 +141,28 @@ export function Settings() {
             <div className="grid gap-2">
               <Label className="text-slate-300">API Host</Label>
               <Input
-                className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-400"
+                className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-300"
                 defaultValue="http://127.0.0.1:10907"
+                readOnly
               />
             </div>
             <Button
               variant="outline"
               className="border-slate-800 text-slate-300 hover:bg-slate-800"
+              onClick={testConnection}
+              disabled={probing}
+              data-testid="settings-test-connection"
             >
-              Test Connection
+              {probing ? "Testing..." : "Test Connection"}
             </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-800 bg-slate-950/50">
-          <CardHeader>
-            <CardTitle className="text-white">Advanced Integration</CardTitle>
-            <CardDescription className="text-slate-400">
-              Custom connection parameters
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label className="text-slate-300">Timeout (ms)</Label>
-              <Input
-                className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-400"
-                defaultValue="5000"
-              />
-            </div>
-            <Button
-              variant="outline"
-              className="border-slate-800 text-slate-300 hover:bg-slate-800"
-            >
-              Save Parameters
-            </Button>
+            {probe && (
+              <p
+                className="text-sm text-slate-300"
+                data-testid="settings-probe-result"
+              >
+                {probe}
+              </p>
+            )}
           </CardContent>
         </Card>
 

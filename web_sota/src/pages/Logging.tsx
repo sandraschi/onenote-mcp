@@ -16,7 +16,7 @@ const LEVEL_COLORS: Record<string, string> = {
   ERROR: "text-red-400 bg-red-950/40",
   WARNING: "text-yellow-400 bg-yellow-950/40",
   INFO: "text-blue-300 bg-blue-950/30",
-  DEBUG: "text-slate-500 bg-slate-900/30",
+  DEBUG: "text-slate-400 bg-slate-900/30",
 };
 
 export default function Logging() {
@@ -30,6 +30,7 @@ export default function Logging() {
   const [sort] = useState("desc");
   const [tail, setTail] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [showClear, setShowClear] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,7 +50,8 @@ export default function Logging() {
       if (search) params.set("search", search);
       if (opts.after_id) params.set("after_id", opts.after_id);
       try {
-        const r = await fetch(`${API_BASE}/api/logs?${params}`);
+        const r = await fetch(`${API_BASE}/logs?${params}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
         if (opts.tail && opts.after_id) {
           setEntries((prev) => [...prev, ...d.entries].slice(-200));
@@ -61,7 +63,7 @@ export default function Logging() {
           afterIdRef.current = d.entries[d.entries.length - 1].id;
         }
       } catch (e) {
-        console.error("Log fetch failed", e);
+        setLoadError(e instanceof Error ? e.message : "Log fetch failed");
       } finally {
         setLoading(false);
       }
@@ -110,7 +112,7 @@ export default function Logging() {
     if (level) params.set("level", level);
     if (kind) params.set("kind", kind);
     if (search) params.set("search", search);
-    const r = await fetch(`${API_BASE}/api/logs/export?${params}`);
+    const r = await fetch(`${API_BASE}/logs/export?${params}`);
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -121,7 +123,7 @@ export default function Logging() {
   };
 
   const handleClear = async () => {
-    await fetch(`${API_BASE}/api/logs`, { method: "DELETE" });
+    await fetch(`${API_BASE}/logs`, { method: "DELETE" });
     setShowClear(false);
     setEntries([]);
     setTotal(0);
@@ -136,7 +138,7 @@ export default function Logging() {
         <h2 className="text-lg font-bold text-slate-200 mr-2">Logs</h2>
         <select
           data-testid="log-level-filter"
-          className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-xs text-slate-300"
+          className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300"
           value={level}
           onChange={(e) => {
             setLevel(e.target.value);
@@ -151,7 +153,8 @@ export default function Logging() {
           ))}
         </select>
         <select
-          className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-xs text-slate-300"
+          data-testid="log-kind-filter"
+          className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300"
           value={kind}
           onChange={(e) => {
             setKind(e.target.value);
@@ -166,13 +169,14 @@ export default function Logging() {
           ))}
         </select>
         <input
-          className="h-8 w-48 rounded border border-slate-700 bg-slate-800 px-2 text-xs text-slate-300 placeholder:text-slate-500"
+          data-testid="log-search"
+          className="h-8 w-48 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300 placeholder:text-slate-400"
           placeholder="Search..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
         />
         <select
-          className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-xs text-slate-300"
+          className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300"
           value={limit}
           onChange={(e) => {
             setLimit(Number(e.target.value));
@@ -185,31 +189,37 @@ export default function Logging() {
           <option value="200">200</option>
         </select>
         <button
-          className={`h-8 rounded px-3 text-xs font-medium ${tail ? "bg-emerald-600 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}
+          className={`h-8 rounded px-3 text-sm font-medium ${tail ? "bg-emerald-600 text-white" : "border border-slate-700 text-slate-300 hover:bg-slate-800"}`}
           onClick={() => setTail(!tail)}
         >
           {tail ? "LIVE" : "Tail"}
         </button>
         <button
-          className="h-8 rounded border border-slate-700 px-3 text-xs text-slate-400 hover:bg-slate-800"
+          className="h-8 rounded border border-slate-700 px-3 text-sm text-slate-300 hover:bg-slate-800"
           onClick={() => handleExport("json")}
         >
           JSON
         </button>
         <button
-          className="h-8 rounded border border-slate-700 px-3 text-xs text-slate-400 hover:bg-slate-800"
+          className="h-8 rounded border border-slate-700 px-3 text-sm text-slate-300 hover:bg-slate-800"
           onClick={() => handleExport("csv")}
         >
           CSV
         </button>
         <button
-          className="h-8 rounded border border-red-800 px-3 text-xs text-red-400 hover:bg-red-950/30"
+          className="h-8 rounded border border-red-800 px-3 text-sm text-red-400 hover:bg-red-950/30"
           onClick={() => setShowClear(true)}
         >
           Clear
         </button>
-        <span className="text-xs text-slate-500 ml-auto">{total} entries</span>
+        <span className="text-sm text-slate-400 ml-auto">{total} entries</span>
       </div>
+
+      {loadError && (
+        <p className="text-sm text-red-400" data-testid="logs-error">
+          Log fetch failed: {loadError}
+        </p>
+      )}
 
       <div
         ref={containerRef}
@@ -217,14 +227,16 @@ export default function Logging() {
         className="h-[65vh] overflow-auto rounded-lg border border-slate-800 bg-slate-950 p-3 font-mono text-xs leading-relaxed"
       >
         {entries.length === 0 && !loading && (
-          <div className="text-slate-600 text-center py-12">No log entries</div>
+          <div className="text-slate-400 text-center py-12 text-sm">
+            No log entries
+          </div>
         )}
         {entries.map((e) => (
           <div
             key={e.id}
             className="flex gap-3 py-0.5 hover:bg-slate-900/50 rounded px-1"
           >
-            <span className="text-slate-600 w-20 shrink-0">
+            <span className="text-slate-500 w-20 shrink-0">
               {e.timestamp.split(".")[0].split("T")[1] || e.timestamp}
             </span>
             <span
@@ -233,7 +245,7 @@ export default function Logging() {
               {e.level}
             </span>
             {e.kind && (
-              <span className="text-slate-500 w-16 shrink-0">[{e.kind}]</span>
+              <span className="text-slate-400 w-16 shrink-0">[{e.kind}]</span>
             )}
             <span className="text-slate-300 break-all">{e.detail}</span>
           </div>
@@ -241,7 +253,7 @@ export default function Logging() {
         <div ref={endRef} />
       </div>
 
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between text-sm text-slate-400">
         <button
           className="px-3 py-1 rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-30"
           disabled={offset <= 0}
@@ -273,12 +285,12 @@ export default function Logging() {
             <h3 className="text-lg font-bold text-slate-200 mb-2">
               Clear all logs?
             </h3>
-            <p className="text-sm text-slate-400 mb-4">
+            <p className="text-sm text-slate-300 mb-4">
               This cannot be undone. The ring buffer will be emptied.
             </p>
             <div className="flex gap-3 justify-end">
               <button
-                className="px-4 py-2 rounded border border-slate-700 text-slate-400 text-sm hover:bg-slate-800"
+                className="px-4 py-2 rounded border border-slate-700 text-slate-300 text-sm hover:bg-slate-800"
                 onClick={() => setShowClear(false)}
               >
                 Cancel

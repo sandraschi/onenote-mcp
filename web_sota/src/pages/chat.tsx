@@ -11,9 +11,9 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { API_BASE } from "@/lib/api";
+import { useLlmStore } from "@/store/llm";
 
-const OLLAMA = "http://localhost:11434";
-const BACKEND = "http://127.0.0.1:10907";
 const HISTORY_KEY = "onenote-mcp-chat-history";
 const PERSONALITY_KEY = "onenote-mcp-chat-personality";
 
@@ -257,8 +257,13 @@ function ChatMessage({
 export function Chat() {
   const [messages, setMessages] = useState<Msg[]>(() => loadHistory());
   const [input, setInput] = useState("");
-  const [model, setModel] = useState("llama3.2");
-  const [ollamaUp, setOllamaUp] = useState<boolean | null>(null);
+  const {
+    providers,
+    provider,
+    model,
+    detecting,
+    refresh: refreshLlm,
+  } = useLlmStore();
   const [loading, setLoading] = useState(false);
   const [personalityId, setPersonalityId] = useState(loadPersonality);
   const [customPrompt] = useState("");
@@ -284,31 +289,22 @@ export function Chat() {
   }, [personalityId]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch(`${BACKEND}/api/llm/discover`);
-        if (r.ok) {
-          const d = await r.json();
-          setOllamaUp(Boolean(d.ollama_detected));
-          if (d.configured_model) setModel(d.configured_model);
-        } else {
-          setOllamaUp(false);
-        }
-      } catch {
-        setOllamaUp(false);
-      }
-    })();
-  }, []);
+    refreshLlm();
+  }, [refreshLlm]);
+
+  const llmUp = detecting
+    ? null
+    : Object.values(providers).some((p) => p.detected);
 
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${BACKEND}/api/skills`);
+        const r = await fetch(`${API_BASE}/skills`);
         if (!r.ok) return;
         const d = (await r.json()) as { skills?: { name?: string }[] };
         const skill = (d.skills ?? []).find((s) => s.name === "onenote");
         if (!skill?.name) return;
-        const cr = await fetch(`${BACKEND}/api/skills/${skill.name}`);
+        const cr = await fetch(`${API_BASE}/skills/${skill.name}`);
         if (!cr.ok) return;
         const cd = (await cr.json()) as { content?: string };
         if (cd.content) setSkillContent(cd.content);
@@ -360,22 +356,27 @@ export function Chat() {
       setLoading(true);
       if (!overrideMsg) isNearBottomRef.current = true;
       try {
-        const r = await fetch(`${OLLAMA}/api/chat`, {
+        const r = await fetch(`${API_BASE}/llm/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            provider,
             model,
             messages: [{ role: "system", content: systemPrompt }, ...next],
-            stream: false,
           }),
         });
-        if (!r.ok) throw new Error(`Ollama HTTP ${r.status}`);
-        const data = (await r.json()) as { message?: { content?: string } };
+        const data = (await r.json()) as {
+          success?: boolean;
+          content?: string;
+          error?: string;
+        };
+        if (!r.ok || !data.success)
+          throw new Error(data.error ?? `backend HTTP ${r.status}`);
         setMessages((m) => [
           ...m,
           {
             role: "assistant",
-            content: data.message?.content ?? "(empty)",
+            content: data.content?.length ? data.content : "(empty)",
             ts: new Date().toISOString(),
           },
         ]);
@@ -392,7 +393,7 @@ export function Chat() {
         setLoading(false);
       }
     },
-    [input, loading, messages, model, systemPrompt],
+    [input, loading, messages, model, provider, systemPrompt],
   );
 
   const regenerate = useCallback(() => {
@@ -474,26 +475,28 @@ export function Chat() {
       data-testid="chat-page"
     >
       <div
-        className="flex items-center justify-between gap-2 text-xs flex-wrap"
+        className="flex items-center justify-between gap-2 text-sm flex-wrap"
         data-testid="chat-controls"
       >
         <div className="flex items-center gap-2">
-          {ollamaUp === null ? (
+          {llmUp === null ? (
             <span className="text-muted-foreground">Detecting...</span>
-          ) : ollamaUp ? (
+          ) : llmUp ? (
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-green-500" /> Ollama
-              :11434
+              <span className="h-2 w-2 rounded-full bg-green-500" />{" "}
+              {provider || "LLM"} via backend proxy
             </span>
           ) : (
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-red-500" /> Ollama not
-              detected
+              <span className="h-2 w-2 rounded-full bg-red-500" /> No local LLM
+              - see Settings
             </span>
           )}
           <input
             value={model}
-            onChange={(e) => setModel(e.target.value)}
+            onChange={(e) =>
+              useLlmStore.getState().select(provider, e.target.value)
+            }
             aria-label="Model name"
             className="rounded border border-border bg-background px-2 py-1 font-mono w-24"
           />
@@ -505,7 +508,7 @@ export function Chat() {
           <select
             value={personalityId}
             onChange={(e) => setPersonalityId(e.target.value)}
-            className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
+            className="rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
             data-testid="personality-select"
           >
             {PERSONALITIES.map((p) => (
@@ -560,7 +563,7 @@ export function Chat() {
                         setInput(s);
                         textareaRef.current?.focus();
                       }}
-                      className="px-3 py-1.5 rounded-full text-xs bg-muted/30 border border-border/30 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                      className="px-3 py-1.5 rounded-full text-sm bg-muted/30 border border-border/30 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-colors"
                     >
                       {s}
                     </button>
@@ -626,7 +629,7 @@ export function Chat() {
           />
           <Button
             onClick={() => send()}
-            disabled={loading || !input.trim() || !ollamaUp}
+            disabled={loading || !input.trim() || !llmUp}
             data-testid="chat-send"
             className="shrink-0 h-10"
           >
