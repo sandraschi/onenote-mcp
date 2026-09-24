@@ -296,7 +296,7 @@ export function Notebooks() {
           <button
             type="button"
             data-testid="notebook-create"
-            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-3 py-1.5"
+            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
             onClick={() => setShowCreate(true)}
             disabled={!selectedNotebook || !authOk}
             title={
