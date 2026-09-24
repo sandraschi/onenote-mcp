@@ -8,6 +8,7 @@
 | Device flow fails with `error_description` | The flow expired (10 min) or the code was mistyped. Restart the flow. |
 | Stale token in `.access-token.txt` | Delete the file and re-authenticate. Tokens rotate; `401` on Graph calls means the stored token expired. |
 | `GRAPH_ACCESS_TOKEN` not picked up | Set it in `.env` at repo root and restart the backend (loaded once at process start). |
+| OneNote calls `401` with code `40001` ("not a valid authentication token") while `/me` works | The default Graph Explorer client ID yields opaque tokens the OneNote workload rejects. Register your own Entra app (docs/ONBOARDING.md), set `ONENOTE_CLIENT_ID` in `.env`, delete `.access-token.txt`, restart, re-authenticate. |
 
 ## Server won't start
 
@@ -18,7 +19,7 @@
 ## Webapp can't reach the backend
 
 - Dev: Vite proxies `/api` -> 10907. If the proxy is missing, check `web_sota/vite.config.ts`.
-- Installed NSIS app: the built frontend calls `http://127.0.0.1:10907` directly (see `web_sota/src/lib/api.ts`). If the backend didn't start, use the dashboard's **Restart Backend** button or check the spawn log.
+- Installed NSIS app: the built frontend calls `http://127.0.0.1:10907/api` directly (see `web_sota/src/lib/api.ts`). If the backend didn't start, use the dashboard's **Restart Backend** button or check the spawn log.
 - CORS: the backend ships the fleet CORS middleware (Tailscale `*.ts.net`, LAN, `tauri://localhost`). Do not loosen it.
 
 ## MCP client can't connect

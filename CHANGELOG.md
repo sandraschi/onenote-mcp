@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- OneNote `401` code `40001` after a successful device login: the borrowed
+  Graph Explorer client ID yields opaque tokens the OneNote workload rejects.
+  `ONENOTE_CLIENT_ID` env/`.env` override added (repo-root `.env` is now
+  actually loaded at startup); docs cover the 5-minute app registration.
+
 ## [1.0.3] - 2026-09-24 (assfix)
 
 ### Fixed
