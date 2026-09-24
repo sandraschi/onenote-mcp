@@ -1,45 +1,18 @@
-Param([switch]$Headless)
-$ErrorActionPreference = "Stop"
-$SkipFrontend = $Headless
+# Fleet launcher (repo root) - thin delegate to the unified starter.
+# All port/backend logic lives in web_sota/start.ps1 + fleet-start.config.ps1.
+param(
+    [switch]$Headless,
+    [switch]$BackendOnly,
+    [switch]$FrontendOnly,
+    [switch]$NoBrowser,
+    [switch]$ReuseIfRunning
+)
 
-# --- SOTA Headless Standard ---
-if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
-    Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
-    exit
+$ErrorActionPreference = 'Stop'
+$target = Join-Path $PSScriptRoot 'web_sota' 'start.ps1'
+if (-not (Test-Path -LiteralPath $target)) {
+    Write-Host "ERROR: Missing web_sota/start.ps1 at $target" -ForegroundColor Red
+    exit 1
 }
-$WindowStyle = if ($Headless) { 'Hidden' } else { 'Normal' }
-# ------------------------------
-
-$env:FASTMCP_LOG_LEVEL = 'WARNING'
-$BackendPort = 10907
-$FrontendPort = 10906
-
-Write-Host 'Starting onenote-mcp...' -ForegroundColor Cyan
-Set-Location $PSScriptRoot
-
-# Clear port zombies before binding
-Get-NetTCPConnection -LocalPort $BackendPort -ErrorAction SilentlyContinue |
-    ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
-Get-NetTCPConnection -LocalPort $FrontendPort -ErrorAction SilentlyContinue |
-    ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
-
-# Launch backend hidden
-Start-Process pwsh -ArgumentList '-NoProfile', '-Command', 'uv run -m onenote_mcp --http' -WindowStyle Hidden
-
-# Readiness poll (TCP, not fixed sleep)
-$ready = $false
-for ($i = 0; $i -lt 60; $i++) {
-    try {
-        $r = Invoke-WebRequest -Uri "http://127.0.0.1:$BackendPort/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
-        if ($r.StatusCode -eq 200) { $ready = $true; break }
-    } catch { }
-    Start-Sleep -Seconds 1
-}
-if ($ready) { Write-Host "Backend ready on :$BackendPort" -ForegroundColor Green }
-else { Write-Host "WARNING: backend not healthy after 60s" -ForegroundColor Yellow }
-
-if ($SkipFrontend) { return }
-
-Set-Location web_sota
-Start-Process "http://127.0.0.1:$FrontendPort"
-npm run dev
+& $target @PSBoundParameters
+exit $LASTEXITCODE

@@ -32,29 +32,24 @@ fix:
 
 # Execute Bandit security audit
 check-sec:
-    Set-Location '{{justfile_directory()}}'
-    uv run bandit -r src/
+    Set-Location '{{justfile_directory()}}'; uv run bandit -r src/
 
 # Execute safety audit of dependencies
 audit-deps:
-    Set-Location '{{justfile_directory()}}'
-    uv run safety check
+    Set-Location '{{justfile_directory()}}'; uv run safety check
 
 # Run the MCP server in HTTP mode (fleet launcher reads fleet-start.config.ps1)
 serve:
-    Set-Location '{{justfile_directory()}}'
-    uv run python -m onenote_mcp --http
+    Set-Location '{{justfile_directory()}}'; uv run python -m onenote_mcp --http
 
 # Run the test suite
 test:
-    Set-Location '{{justfile_directory()}}'
-    uv run pytest tests/ -q
+    Set-Location '{{justfile_directory()}}'; uv run pytest tests/ -q
 
 # Format and lint (fix pass)
 fmt:
-    Set-Location '{{justfile_directory()}}'
-    uv run ruff format .
-    uv run ruff check . --fix
+    Set-Location '{{justfile_directory()}}'; uv run ruff format .
+    Set-Location '{{justfile_directory()}}'; uv run ruff check . --fix
 
 # Playwright e2e (webapp)
 e2e:

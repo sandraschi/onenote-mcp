@@ -5,7 +5,7 @@
     BackendPort  = 10907
     FrontendPort = 10906
     HealthPath   = '/health'
-    WebRoot      = 'D:\Dev\repos\onenote-mcp\web_sota'
+    WebRoot      = 'web_sota'
     Backend = @{
         Kind          = 'uvicorn'
         UvicornTarget = 'onenote_mcp.server:http_app'
