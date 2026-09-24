@@ -19,7 +19,7 @@ dual transport (stdio + HTTP streamable on 10907).
 
 ## Best practices
 
-1. **Authenticate first.** If any tool returns `No access token available`,
+1. **Sign in first.** If any tool returns `No access token available`,
    call `authenticate()` (device-code flow) before anything else.
 2. **Navigate top-down.** Start with `onenote_list_notebooks()`, then
    `onenote_get_notebook_toc(notebook_id=...)` to see sections + pages in one

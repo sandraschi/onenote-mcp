@@ -323,10 +323,11 @@ export function Notebooks() {
         >
           <div>
             <p className="text-sm text-amber-300 font-medium">
-              OneNote not connected
+              You&apos;re not signed in
             </p>
             <p className="text-sm text-slate-300">
-              Connect your Microsoft account to browse notebooks and pages.
+              Sign in with your Microsoft account to browse notebooks and pages,
+              then click the blue button.
             </p>
           </div>
           {!authFlow ? (
@@ -417,7 +418,7 @@ export function Notebooks() {
             </div>
           ) : notebooks.length === 0 ? (
             <p className="p-4 text-sm text-slate-400">
-              No notebooks found. Connect your Microsoft account first.
+              No notebooks found. Sign in with your Microsoft account first.
             </p>
           ) : (
             <ul className="divide-y divide-slate-800/60 max-h-[300px] overflow-y-auto">

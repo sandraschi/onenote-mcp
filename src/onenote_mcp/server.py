@@ -92,7 +92,7 @@ async def get_graph_client() -> httpx.AsyncClient:
 
     token = load_access_token()
     if not token:
-        raise ValueError("No access token available. Please authenticate first.")
+        raise ValueError("No access token available. Please sign in first (Notebooks page, blue button).")
 
     _graph_client = httpx.AsyncClient(
         base_url="https://graph.microsoft.com/v1.0", headers={"Authorization": f"Bearer {token}"}
@@ -1194,7 +1194,7 @@ async def onenote_help() -> str:
     onenote_help()
     """
     return """📚 **OneNote MCP tools:**
-- `authenticate` - start Microsoft device-code login
+- `authenticate` - sign in with Microsoft (device-code flow)
 - `onenote_save_access_token` - store a Graph token manually
 - `onenote_list_notebooks` - all notebooks
 - `onenote_get_notebook` - notebook details

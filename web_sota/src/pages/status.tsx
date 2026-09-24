@@ -89,7 +89,7 @@ export function Status() {
         <Card className="border-slate-800 bg-slate-950/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-200">
-              Auth Session
+              Sign-in session
             </CardTitle>
             <Shield className="h-4 w-4 text-emerald-500" />
           </CardHeader>
@@ -98,7 +98,7 @@ export function Status() {
               className="text-2xl font-bold text-white"
               data-testid="status-auth"
             >
-              {authed === null ? "-" : authed ? "ACTIVE" : "SIGNED OUT"}
+              {authed === null ? "-" : authed ? "SIGNED IN" : "NOT SIGNED IN"}
             </div>
           </CardContent>
         </Card>

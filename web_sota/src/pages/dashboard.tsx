@@ -212,15 +212,15 @@ export function Dashboard() {
         <Card className="border-slate-800 bg-slate-950/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-200">
-              Graph Auth
+              Sign-in status
             </CardTitle>
             <Network className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
               {status?.providers?.graph?.authenticated
-                ? "Authenticated"
-                : "Not authed"}
+                ? "Signed in"
+                : "Not signed in"}
             </div>
             <p className="text-sm text-slate-300">Microsoft account status</p>
           </CardContent>
@@ -256,11 +256,10 @@ export function Dashboard() {
                 <HardDrive className="h-4 w-4 text-slate-400 mr-2" />
                 <div className="ml-2 space-y-1">
                   <p className="text-sm font-medium leading-none text-white">
-                    Not authenticated yet?
+                    Not signed in yet?
                   </p>
                   <p className="text-sm text-slate-300">
-                    Head to Settings to run the Microsoft device-code login, or
-                    use the <code>authenticate</code> MCP tool.
+                    Open the Notebooks page and click Sign in with Microsoft.
                   </p>
                 </div>
               </div>
