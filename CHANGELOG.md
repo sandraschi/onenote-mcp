@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.0.3] - 2026-09-24 (assfix)
+
+### Fixed
+- Launcher failure: worktree `fleet-start.config.ps1` had regressed
+  `UvicornTarget` to the raw FastMCP `server:app` (every route 500'd);
+  restored to `server:http_app`, `WebRoot` made relative. Verified
+  backend+frontend 200 via the real `web_sota/start.ps1` path.
+- Tauri desktop app called all APIs at the wrong base (`...:10907/status`
+  instead of `.../api/status`); `API_BASE` now appends `/api` under Tauri.
+- Logging page used a double `/api/api/logs*` prefix (404 in dev and Tauri).
+- Status/Tools pages showed hardcoded mock data (ACTIVE/12/45MB, fictional
+  `onenote_sync`); both now render live `/api/status` + `/api/capabilities`.
+- Chat called Ollama directly from the browser; now goes through the backend
+  proxy. Settings dead buttons (Test Connection, Save Parameters) wired/removed.
+- Wrong callable names in `onenote_help` + tool examples (`save_access_token`,
+  `list_notebooks`, ...); corrected to the real `onenote_*` names.
+- CUA smoke config pointed at non-existent `/api/v1/system/info`; now
+  `/api/status`, with real `nav_routes` for the sidebar walk.
+
+### Added
+- Backend LLM surface: `POST /api/llm/chat` proxy (Ollama + OpenAI-compatible
+  LM Studio/vLLM), `GET /api/llm/providers`, `/api/llm/models`,
+  `/api/llm/onboarding`. Chat + Settings share a Zustand `store/llm.ts`.
+- Skills page (`/skills`) backed by `/api/skills`; sidebar + App routes.
+- `@app.prompt()` `onenote_triage` guided-triage prompt.
+- `renovate.json`, `.agents/skills/` session-context skill.
+
+### Changed
+- Ruff: `T20` enforced, `S110`/`S112` un-ignored (with scoped per-file-ignores
+  for CLI/demo/test/CUA scripts); `ruff check .` + format now fully green.
+- Justfile lone `Set-Location` lines joined (Windows per-line shell pitfall).
+- Root `start.ps1` collapsed to a thin delegate of `web_sota/start.ps1`.
+
 ## [1.0.1] - 2026-08-01 (assfix follow-up)
 
 ### Fixed

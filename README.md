@@ -25,7 +25,7 @@ cd onenote-mcp
 just
 ```
 
-This opens an interactive dashboard showing all available commands. Run `just bootstrap` to install dependencies, then `just serve` or `just dev` to start.
+This opens an interactive dashboard showing all available commands. Run `just bootstrap` to install dependencies, then `just serve` to start.
 
 ### Manual Setup
 
@@ -209,7 +209,7 @@ Once authenticated, the following tools are available for AI assistants to use:
 | `onenote_get_page` | Get the complete content of a specific page, including HTML formatting |
 | `onenote_create_page` | Create a new page with HTML content |
 | `onenote_search_pages` | Search for pages across your notebooks |
-| `onenote_get_notebookTOC` | Generate a Table of Contents for a notebook (all sections & pages) |
+| `onenote_get_notebook_toc` | Generate a Table of Contents for a notebook (all sections & pages) |
 
 ## Example Interactions
 
@@ -248,7 +248,7 @@ User: I want to read through all my OneNote pages so I can ask questions about t
 AI: (runs read-all-pages.js) I've retrieved the full content of all your pages in a readable format. Now you can ask me specific questions about any of the content.
 
 User: Generate a table of contents for my Projects notebook
-AI: (uses onenote_get_notebookTOC) Here's the TOC for your Projects notebook:
+AI: (uses onenote_get_notebook_toc) Here's the TOC for your Projects notebook:
 
 # Projects
 > 3 sections, 12 pages
@@ -260,7 +260,7 @@ AI: (uses onenote_get_notebookTOC) Here's the TOC for your Projects notebook:
 ...
 
 User: Show me a TOC of all my notebooks
-AI: (uses onenote_list_notebooks, then onenote_get_notebookTOC for each) Here are all your notebooks with their structure...
+AI: (uses onenote_list_notebooks, then onenote_get_notebook_toc for each) Here are all your notebooks with their structure...
 ```
 
 ## Advanced: Direct Script Usage
@@ -314,10 +314,10 @@ This project builds upon the [azure-onenote-mcp-server](https://github.com/Zubei
 
 This project adheres to **SOTA 14.1** industrial standards for high-fidelity agentic orchestration:
 
-- **Python (Core)**: [Ruff](https://astral.sh/ruff) for linting and formatting. Zero-tolerance for `print` statements in core handlers (`T201`).
+- **Python (Core)**: [Ruff](https://astral.sh/ruff) for linting and formatting. Zero-tolerance for `print` statements in core handlers (`T20`).
 - **Webapp (UI)**: [Biome](https://biomejs.dev/) for sub-millisecond linting. Strict `noConsoleLog` enforcement.
 - **Protocol Compliance**: Hardened `stdout/stderr` isolation to ensure crash-resistant JSON-RPC communication.
-- **Automation**: [Justfile](./justfile) recipes for all fleet operations (`just lint`, `just fix`, `just dev`).
+- **Automation**: [Justfile](./justfile) recipes for all fleet operations (`just lint`, `just fix`, `just serve`).
 - **Security**: Automated audits via `bandit` and `safety`.
 
 ## License

@@ -21,7 +21,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `ONENOTE_LOG_LEVEL` | info | uvicorn log level |
 | `MCP_BRIDGE_URLS` | - | Comma-separated remote MCP URLs proxied via create_proxy |
 
-## MCP tools (13)
+## MCP tools (13) + prompts (1)
 
 | Tool | Purpose |
 |------|---------|
@@ -39,6 +39,8 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `onenote_help` | Tool list and usage notes |
 | `shutdown_server` | Graceful server termination |
 
+Prompt: `onenote_triage` - guided DISCOVER/RETRIEVE/MAP/CAPTURE triage.
+
 ## REST API (webapp surface)
 
 - `GET /health` — liveness probe
@@ -52,6 +54,10 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 - `GET /api/skills`, `GET /api/skills/{name}` — skills list + SKILL.md content
 - `GET /api/fleet/apps` — Apps Hub registry (adjacent fleet webapps)
 - `GET /api/llm/discover` — local LLM probe (Ollama :11434, LM Studio :1234, vLLM :8000; `providers[].models`)
+- `GET /api/llm/providers` — provider registry (detected flags + models, no keys)
+- `GET /api/llm/models?provider=` — model list for one provider
+- `GET /api/llm/onboarding` — starter facts + recommended path
+- `POST /api/llm/chat` — backend chat proxy (Ollama + OpenAI-compatible); the ONLY path Chat uses
 - `POST /api/shutdown` — graceful shutdown (agent-requested)
 
 ## Architecture
@@ -59,13 +65,15 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 `server.py` builds the FastMCP app with `custom_route` REST endpoints and registers tools.
 The module exposes `http_app` (CORS-wrapped `app.http_app()`) as the uvicorn ASGI target —
 never the raw FastMCP object. `transport.py` serves stdio/http/sse from the CLI. `run_server.py`
-is the PyInstaller entry: FastAPI shell with CORS + `/mcp` mount. `native/` bundles the backend
-exe as a Tauri resource (`.env.example` template only, never `.env`).
+is the PyInstaller entry: serves `http_app` directly via `uvicorn.run` (no FastAPI shell).
+`native/` bundles the backend exe as a Tauri resource (`.env.example` template only, never `.env`).
 
 ## Webapp pages
 
-Dashboard (live KPIs), Notebooks (tree browser + page viewer + search + create), Tools, Status,
-Apps, Chat (personality selector, localStorage history), Logging (ring buffer viewer), Help, Settings (auth + LLM provider).
+Dashboard (live KPIs), Notebooks (tree browser + page viewer + search + create), Tools (live
+`/api/capabilities`), Status (live `/api/status`), Apps, Skills (`/api/skills` viewer),
+Chat (backend `/api/llm/chat` proxy, personality selector, localStorage history), Logging
+(ring buffer viewer), Help, Settings (auth + LLM provider).
 
 ## Troubleshooting
 
