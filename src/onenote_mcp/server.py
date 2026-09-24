@@ -760,7 +760,10 @@ async def api_auth_callback(request: Request) -> "HTMLResponse":
         return _auth_page("Login expired", "No matching login session - start sign-in again.", ok=False)
     app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
     try:
-        result = app.acquire_token_by_authorization_code(params, entry["flow"])
+        # Modern MSAL API: flow first, response second. (The legacy
+        # acquire_token_by_authorization_code(code, scopes) takes a scope
+        # list second - passing the flow dict raises "Invalid parameter type".)
+        result = app.acquire_token_by_auth_code_flow(entry["flow"], dict(params))
     except Exception as exc:
         import traceback as _tb
 
