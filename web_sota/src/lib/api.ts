@@ -5,7 +5,7 @@ const isTauri =
 // the Tauri WebView has no proxy, so the API base must be absolute there.
 export const API_BASE =
   import.meta.env.VITE_API_BASE ||
-  (isTauri ? "http://127.0.0.1:10907" : "/api");
+  (isTauri ? "http://127.0.0.1:10907/api" : "/api");
 
 export async function fetchJson<T = unknown>(
   path: string,

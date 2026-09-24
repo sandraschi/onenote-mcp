@@ -13,6 +13,7 @@ import { Help } from "@/pages/help";
 import Logging from "@/pages/Logging";
 import { Notebooks } from "@/pages/notebooks";
 import { Settings } from "@/pages/settings";
+import { Skills } from "@/pages/skills";
 import { Status } from "@/pages/status";
 import { Tools } from "@/pages/tools";
 
@@ -29,6 +30,7 @@ function App() {
           <Route path="/apps" element={<Apps />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/logging" element={<Logging />} />
+          <Route path="/skills" element={<Skills />} />
           <Route path="/help" element={<Help />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />

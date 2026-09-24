@@ -30,6 +30,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/apps", label: "App Hub", icon: Grid },
     { href: "/chat", label: "AI Command", icon: Bot },
     { href: "/logging", label: "Logging", icon: Activity },
+    { href: "/skills", label: "Skills", icon: BookOpen },
     { href: "/help", label: "Help", icon: HelpCircle },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
