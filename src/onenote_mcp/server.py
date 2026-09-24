@@ -753,9 +753,20 @@ async def api_auth_callback(request: Request) -> "HTMLResponse":
         return _auth_page("Sign-in refused", params.get("error_description", params["error"]), ok=False)
     entry = _auth_code_flows.pop(params.get("state", ""), None)
     if not entry:
+        _log.error(
+            "auth",
+            "callback with unknown/expired state - backend likely restarted after login started",
+        )
         return _auth_page("Login expired", "No matching login session - start sign-in again.", ok=False)
     app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
-    result = app.acquire_token_by_authorization_code(params, entry["flow"])
+    try:
+        result = app.acquire_token_by_authorization_code(params, entry["flow"])
+    except Exception as exc:
+        import traceback as _tb
+
+        logger.exception("auth code exchange crashed: %s", exc)
+        _log.error("auth", f"code exchange crashed: {exc}\n{_tb.format_exc()[-1500:]}")
+        return _auth_page("Sign-in failed", f"Code exchange crashed: {exc}", ok=False)
     if "access_token" in result:
         save_access_token(result["access_token"])
         account = result.get("id_token_claims", {}).get("preferred_username", "")
