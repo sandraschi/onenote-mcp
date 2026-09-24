@@ -6,8 +6,20 @@
     "backend_port": 10907,
     "health_path": "/api/v1/health",
     "diagnostics_path": "/api/v1/diagnostics",
-    "feature_smoke_path": "/api/v1/system/info",
+    "feature_smoke_path": "/api/status",
     "window_title_re": "OneNote MCP",
+    "nav_routes": [
+        ["Overview", "OneNote Notebooks"],
+        ["Notebooks", "OneNote Notebooks"],
+        ["Tools", "Tool Inventory"],
+        ["Status", "Microsoft Graph Status"],
+        ["App Hub", "App Hub"],
+        ["AI Command", "Ask about OneNote"],
+        ["Logging", "Logs"],
+        ["Skills", "Skills"],
+        ["Help", "Help"],
+        ["Settings", "Configuration"]
+    ],
     "nsis_glob": "native/target/release/bundle/nsis/OneNote MCP_*_x64-setup.exe",
     "bridge_ok_text": "REST bridge reachable",
     "uninstall_registry_filter": "*OneNote MCP*"

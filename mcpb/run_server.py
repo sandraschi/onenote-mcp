@@ -15,14 +15,16 @@ if str(base / "src") not in sys.path:
 
 os.environ.setdefault("MCP_TRANSPORT", "http")
 
-if __name__ == "__main__":
-    import uvicorn
+# Top-level imports (not under `__main__`): the bundle entry must import its
+# own package on load so mcpb verify_pack.py import-isolation can prove the
+# staged copy resolves (runpy executes with a non-"__main__" run_name).
+import uvicorn
+from onenote_mcp.server import http_app
 
+if __name__ == "__main__":
     # Fleet standard: serve the CORS-wrapped mcp.http_app() directly.
     # The FastMCP app carries the custom routes at root (/health, /api/*) and
     # the streamable HTTP transport at /mcp - no FastAPI shell wrapper needed.
-    from onenote_mcp.server import http_app
-
     host = os.environ.get("ONENOTE_HOST", "127.0.0.1")
     port = int(os.environ.get("ONENOTE_PORT", os.environ.get("MCP_PORT", "10907")))
     log_level = os.environ.get("ONENOTE_LOG_LEVEL", "info")
