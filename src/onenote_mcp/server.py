@@ -1,6 +1,7 @@
 """FastMCP server for Microsoft OneNote integration."""
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -72,8 +73,11 @@ def load_access_token() -> str | None:
 
 def save_access_token(token: str) -> None:
     """Save access token to file."""
-    global _access_token
+    global _access_token, _graph_client
     _access_token = token
+    # Drop the cached Graph client: it was built with the previous token's
+    # Authorization header and would otherwise keep 401ing after re-auth.
+    _graph_client = None
 
     token_data = json.dumps({"token": token}, indent=2)
     TOKEN_FILE_PATH.write_text(token_data)
@@ -638,20 +642,25 @@ def _start_auth_flow() -> dict[str, Any]:
         raise ValueError("Failed to create device flow")
     flow_id = flow.get("device_code", "")[-8:]
     _auth_flows[flow_id] = {"flow": flow, "status": "pending", "result": None}
+    _log.info("auth", f"device flow started (user_code={flow['user_code']})")
 
     def _wait():
         result = app.acquire_token_by_device_flow(flow)
         if "access_token" in result:
             save_access_token(result["access_token"])
+            account = result.get("id_token_claims", {}).get("preferred_username", "")
+            _log.info("auth", f"device flow authorized ({account})")
             _auth_flows[flow_id]["result"] = {
                 "success": True,
-                "account": result.get("id_token_claims", {}).get("preferred_username", ""),
+                "account": account,
             }
             _auth_flows[flow_id]["status"] = "authorized"
         else:
+            err = result.get("error_description", "Authentication failed")
+            _log.error("auth", f"device flow failed: {err}")
             _auth_flows[flow_id]["result"] = {
                 "success": False,
-                "error": result.get("error_description", "Authentication failed"),
+                "error": err,
             }
             _auth_flows[flow_id]["status"] = "error"
 
@@ -692,6 +701,53 @@ async def api_auth_poll(request: Request) -> JSONResponse:
 async def api_auth_status(request: Request) -> JSONResponse:
     token = load_access_token()
     return JSONResponse({"authenticated": bool(token)})
+
+
+def _decode_jwt_claims(token: str) -> dict[str, Any] | None:
+    """Decode JWT payload WITHOUT signature verification (diagnostics only)."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        payload = parts[1] + "=" * (-len(parts[1]) % 4)
+        return json.loads(base64.urlsafe_b64decode(payload).decode("utf-8"))
+    except Exception:
+        return None
+
+
+@app.custom_route("/api/auth/debug", methods=["GET"])
+async def api_auth_debug(request: Request) -> JSONResponse:
+    """Local-only auth diagnostics. Returns no secrets - safe to paste into
+    issues. Shows which client ID is active, token shape/age, and (for JWTs)
+    audience, scopes, appid, tenant, account, and expiry."""
+    token = load_access_token()
+    info: dict[str, Any] = {
+        "client_id_suffix": CLIENT_ID[-4:],
+        "scopes_requested": SCOPES,
+        "token_present": bool(token),
+        "token_format": None,
+        "token_age_seconds": None,
+        "graph_client_cached": _graph_client is not None,
+    }
+    if token:
+        info["token_format"] = "jwt" if token.startswith("eyJ") else "opaque"
+        try:
+            info["token_age_seconds"] = int(time.time() - TOKEN_FILE_PATH.stat().st_mtime)
+        except OSError:
+            info["token_age_seconds"] = None  # env-provided token, no file
+        claims = _decode_jwt_claims(token)
+        if claims:
+            exp = claims.get("exp")
+            now = int(time.time())
+            info["jwt"] = {
+                "aud": claims.get("aud"),
+                "scp": claims.get("scp"),
+                "appid": claims.get("appid"),
+                "tid": claims.get("tid"),
+                "account": claims.get("preferred_username") or claims.get("upn"),
+                "expires_in_seconds": (exp - now) if isinstance(exp, int) else None,
+            }
+    return JSONResponse(info)
 
 
 # ---- REST API for the webapp (notebook/section/page browser) ----
