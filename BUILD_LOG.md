@@ -40,3 +40,14 @@ Dashboard/Logging headers — expected-text drift from the CUA template).
 - ruff check/format: clean; pytest: 3 passed; tsc -b: clean; biome: 4 infos only
 - PyInstaller backend: 27.6 MB (>= 5 MB gate OK)
 - Frontend dist CSS: 30.9 kB (Tailwind gate OK)
+
+## 2026-09-24 - frozen exe crashed at startup (jaraco.text)
+- Symptom: ModuleNotFoundError: No module named 'jaraco.text' from
+  pyi_rth_pkgres.py before app code runs. PyInstaller's pkg_resources
+  runtime hook fires but jaraco helpers were never bundled.
+- Fix: jaraco.text, jaraco.context, jaraco.functools added to
+  hiddenimports in onenote-mcp-backend.spec. Spec syntax verified;
+  full frozen rebuild + smoke still pending (next native build).
+- Fleet note: 159 other *-backend.spec files share the template gap -
+  only bites when pkg_resources lands in the frozen graph. Fixed here
+  where it bit; no fleet-wide sweep (batch rule).

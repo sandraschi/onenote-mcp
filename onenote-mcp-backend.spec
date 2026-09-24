@@ -31,6 +31,11 @@ hiddenimports = [
     "joserfc",
     "joserfc.jwk",
     "joserfc.jwt",
+    # setuptools/pkg_resources runtime hook needs these; PyInstaller does not
+    # auto-detect them (ModuleNotFoundError: No module named 'jaraco.text').
+    "jaraco.text",
+    "jaraco.context",
+    "jaraco.functools",
 ]
 
 a = Analysis(
