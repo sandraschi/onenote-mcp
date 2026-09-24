@@ -95,8 +95,23 @@ proven healthy via Graph Explorer.** See "Next steps" for the ranked plan.
 4. **Do NOT chase:** new MSA, new tenant, paid Azure, scope-format tweaks
    (`Notes.Read` vs `.All`), beta endpoints — all tested or irrelevant.
 
-## Appendix: environment that works
+## Appendix: competition (GitHub research 2026-09-24, 46 OneNote-MCP repos)
 
+| Repo | Stars | Auth | Reads page content? | Verdict |
+|---|---|---|---|---|
+| `danosb/onenote-mcp` (JS, our README ancestor) | 125 | Borrowed Graph Explorer client ID + device flow, `Notes.Read.All` — the exact setup that 40001s for us | Yes (HTML + text extract) | Same trap, no advantage; stale (Apr 2025) |
+| `OfficeMCP/OfficeMCP` (Python) | 119 | None (drives desktop Office apps via automation) | Via app UI, not Graph | Bypasses Entra entirely IF OneNote app installed; brittle COM route, Graph-independent fallback |
+| `purpleslurple/onenote-mcp-server` (Python, FastMCP) | 52 | Own app, MULTI-TENANT, base scopes `Notes.Read/Notes.ReadWrite` (not `.All`), device flow, token cache | Yes | Closest working recipe; base-scopes + multi-tenant is an untested combo for us |
+| `ZubeidHendricks/azure-onenote-mcp-server` (TS, our upstream) | 26 | Own app | Partial | Stale (May 2025) |
+| `pnp/cli-microsoft365-mcp-server` (TS, PnP community) | 133 | CLI-for-M365 Entra app | **No** — only `notebook add/list`, `page list` | Cannot replace; complement at most |
+| `ask-marcel/ask-marcel-office-cli` (TS, 204 cmds) | 9 | **No registration: Playwright-captured first-party Teams token** | **Yes, as markdown** (`get-onenote-page-as-markdown` + raw HTML variant) | **Best immediate option**: works around our whole auth disaster by design |
+| `eshlon/onenotemcp`, `rajvirtual/MCP-Servers`, `jisujit/onenote-mcp-server` | 5–14 | Various Graph | Mixed | Too small/stale to matter |
+
+Net: nobody beats our feature set (13 tools + webapp + Tauri + MCPB); the
+auth wall hits everyone using custom-app tokens the same way. ask-marcel is
+the pragmatic unblock, not a replacement.
+
+## Appendix: environment that works
 - Backend: `ONENOTE_CLIENT_ID=b70aba9c-…` (or unset for default),
   `ONENOTE_AUTHORITY=https://login.microsoftonline.com/common`
   (multi-tenant app) — debug endpoint confirms live values.
