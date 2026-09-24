@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Docs
+- `docs/AUTH_INVESTIGATION.md`: full 2026-09-24 401-odyssey record (evidence,
+  killed theories, request IDs, ranked plan, PnP verdict).
+
 ### Fixed
 - OneNote `401` code `40001` after a successful device login: the borrowed
   Graph Explorer client ID yields opaque tokens the OneNote workload rejects.
