@@ -51,6 +51,10 @@ them with `40001 Unauthorized`. The fix is a free 5-minute app registration:
    (required — without this the device flow fails with `unauthorized_client`).
 7. Set `ONENOTE_CLIENT_ID=<your id>` in `.env` at the repo root, delete
    `.access-token.txt`, restart the backend, and run the device flow again.
+8. If your app is **Personal Microsoft accounts only**, also set
+   `ONENOTE_AUTHORITY=https://login.microsoftonline.com/consumers` in `.env`
+   (the default `/common` endpoint rejects personal-only apps with
+   `AADSTS9002346` at flow initiation).
 
 ## 3. Start using it
 

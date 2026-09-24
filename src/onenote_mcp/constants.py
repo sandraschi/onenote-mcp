@@ -21,6 +21,11 @@ except Exception as exc:
 CLIENT_ID = os.environ.get("ONENOTE_CLIENT_ID", "14d82eec-204b-4c2f-b7e8-296a70dab67e")
 SCOPES = ["Notes.Read.All", "Notes.ReadWrite.All", "User.Read"]
 
+# Entra authority. Apps registered for "Personal Microsoft accounts only"
+# MUST use the /consumers endpoint (/common is rejected with AADSTS9002346).
+# Multi-tenant apps ("any organization + personal") use /common.
+AUTHORITY = os.environ.get("ONENOTE_AUTHORITY", "https://login.microsoftonline.com/common")
+
 # Response limits
 CHARACTER_LIMIT = 25000
 

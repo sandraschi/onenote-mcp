@@ -22,7 +22,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from .constants import CLIENT_ID, SCOPES, TOKEN_FILE_NAME
+from .constants import AUTHORITY, CLIENT_ID, SCOPES, TOKEN_FILE_NAME
 from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -102,12 +102,12 @@ async def get_graph_client() -> httpx.AsyncClient:
 
 async def authenticate_device_code() -> dict[str, Any]:
     """Start device code authentication flow."""
-    app = msal.PublicClientApplication(CLIENT_ID, authority="https://login.microsoftonline.com/common")
+    app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
 
     # Get device code
     flow = app.initiate_device_flow(scopes=SCOPES)
     if "user_code" not in flow:
-        raise ValueError("Failed to create device flow")
+        raise ValueError(f"Failed to create device flow: {flow.get('error_description', flow.get('error', 'unknown'))}")
 
     logger.info("To authenticate: %s (code: %s)", flow["verification_uri"], flow["user_code"])
 
@@ -636,10 +636,10 @@ _auth_flows: dict[str, dict[str, Any]] = {}
 def _start_auth_flow() -> dict[str, Any]:
     import msal
 
-    app = msal.PublicClientApplication(CLIENT_ID, authority="https://login.microsoftonline.com/common")
+    app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
     flow = app.initiate_device_flow(scopes=SCOPES)
     if "user_code" not in flow:
-        raise ValueError("Failed to create device flow")
+        raise ValueError(f"Failed to create device flow: {flow.get('error_description', flow.get('error', 'unknown'))}")
     flow_id = flow.get("device_code", "")[-8:]
     _auth_flows[flow_id] = {"flow": flow, "status": "pending", "result": None}
     _log.info("auth", f"device flow started (user_code={flow['user_code']})")
@@ -723,6 +723,7 @@ async def api_auth_debug(request: Request) -> JSONResponse:
     token = load_access_token()
     info: dict[str, Any] = {
         "client_id_suffix": CLIENT_ID[-4:],
+        "authority": AUTHORITY,
         "scopes_requested": SCOPES,
         "token_present": bool(token),
         "token_format": None,
