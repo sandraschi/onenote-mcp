@@ -263,6 +263,24 @@ async def get_page(page_id: str) -> Page:
     )
 
 
+def text_to_html(text: str) -> str:
+    """Plain text -> semantic HTML (blank lines = paragraphs). Shared by
+    create/append so the webapp and MCP tools behave identically."""
+    import html as _html
+
+    paras = (text or "").replace("\r\n", "\n").split("\n\n")
+    blocks = "".join(f"<p>{_html.escape(p).replace(chr(10), '<br/>')}</p>" for p in paras if p.strip())
+    return blocks or "<p></p>"
+
+
+async def append_page_content(page_id: str, text: str) -> None:
+    """Append plain-text paragraphs to the end of a OneNote page body."""
+    client = await get_graph_client()
+    commands = [{"target": "body", "action": "append", "position": "after", "content": text_to_html(text)}]
+    response = await client.patch(f"/me/onenote/pages/{page_id}/content", json=commands)
+    response.raise_for_status()
+
+
 async def create_page(notebook_id: str, title: str, content: str) -> dict[str, Any]:
     """Create a new page with HTML content."""
     client = await get_graph_client()
@@ -421,6 +439,7 @@ _TOOL_REGISTRY: tuple[str, ...] = (
     "onenote_list_pages",
     "onenote_get_page",
     "onenote_create_page",
+    "onenote_append_page",
     "onenote_search_pages",
     "onenote_index_start",
     "onenote_index_status",
@@ -976,6 +995,23 @@ async def api_get_page(request: Request) -> JSONResponse:
         return _error_response(exc)
 
 
+@app.custom_route("/api/pages/{page_id}/append", methods=["PATCH"])
+async def api_append_page(request: Request) -> JSONResponse:
+    page_id = request.path_params["page_id"]
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "invalid JSON body"}, status_code=400)
+    content = str(body.get("content") or "")
+    if not content.strip():
+        return JSONResponse({"success": False, "error": "content (plain text) required"}, status_code=400)
+    try:
+        await append_page_content(page_id, content)
+        return JSONResponse({"success": True, "page_id": page_id})
+    except Exception as exc:
+        return _error_response(exc)
+
+
 @app.custom_route("/api/search", methods=["GET"])
 async def api_search_pages(request: Request) -> JSONResponse:
     query = request.query_params.get("q", "")
@@ -1275,6 +1311,28 @@ async def onenote_create_page(
         return f"❌ Failed to create page: {e!s}"
 
 
+@app.tool(annotations=_MUTATING)
+async def onenote_append_page(
+    page_id: Annotated[str, Field(description="The ID of the page to append to")],
+    content: Annotated[str, Field(description="Plain text to append (blank lines = paragraphs)")],
+) -> str:
+    """Append plain text to the end of a OneNote page.
+
+    ## Return Format
+    Confirmation string: "✅ Appended to page `<id>`".
+
+    ## Examples
+    onenote_append_page(page_id="0-PG123...", content="Follow-up note\\n\\nSecond paragraph")
+    """
+    try:
+        if not content.strip():
+            return "❌ Nothing to append - content is empty."
+        await append_page_content(page_id, content)
+        return f"✅ Appended to page `{page_id}`"
+    except Exception as e:
+        return f"❌ Failed to append: {e!s}"
+
+
 @app.tool(annotations=_READONLY)
 async def onenote_search_pages(
     query: Annotated[str, Field(description="Search query string")],
@@ -1423,7 +1481,7 @@ async def onenote_help() -> str:
     """List the available OneNote MCP tools and when to use each.
 
     ## Return Format
-    Markdown string enumerating the 15 tools with one-line usage notes.
+    Markdown string enumerating the 16 tools with one-line usage notes.
 
     ## Examples
     onenote_help()
@@ -1437,6 +1495,7 @@ async def onenote_help() -> str:
 - `onenote_list_pages` - pages of a section
 - `onenote_get_page` - full HTML content of a page
 - `onenote_create_page` - add a page with HTML body
+- `onenote_append_page` - append plain text to a page
 - `onenote_search_pages` - title or full-text search across notebooks
 - `onenote_index_start` - build the full-text index (background)
 - `onenote_index_status` - index progress and coverage
