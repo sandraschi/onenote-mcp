@@ -22,16 +22,21 @@ just bootstrap        # uv sync + pre-commit + webapp deps
 Run the server and trigger the device-code flow - either:
 
 - **MCP client**: call the `authenticate` tool, or
-- **Webapp**: open `http://127.0.0.1:10906`, go to **Settings** (or Notebooks)
-  and click the sign-in flow, or
+- **Webapp**: open `http://127.0.0.1:10906`, go to **Notebooks**
+  and click **Sign in with Microsoft** (browser flow; device-code is the
+  fallback via the `authenticate` tool), or
 - **CLI**: `uv run python -m onenote_mcp.authenticate_device_code` equivalent via the webapp.
 
 You get a URL (`https://microsoft.com/devicelogin`) and a code. Sign in with
 your Microsoft account and approve the OneNote/Graph scopes. The access token is
 stored in `.access-token.txt` at the repo root.
 
-> The token expires - if tools start failing with 401s, re-run the flow or set a
-> fresh `GRAPH_ACCESS_TOKEN` in `.env`.
+> Token lifetimes: the access token lasts ~1 hour, but you will not notice
+> — the backend silently refreshes it from the cached refresh token
+> (`.msal-token-cache.bin`), which stays valid ~90 days. Only after ~90 days
+> (or if you revoke the app at account.live.com) do you sign in again. If
+> tools fail with 401s despite this, check `/api/auth/debug` — then re-run
+> the flow or set a fresh `GRAPH_ACCESS_TOKEN` in `.env`.
 
 ### If OneNote calls fail with 40001 (own app registration)
 
