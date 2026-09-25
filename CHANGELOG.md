@@ -10,6 +10,10 @@
   ghaudit stale, thin coverage, no shortcuts.
 
 ### Added
+- Dedicated Search page (`/search`, sidebar): big input, Title/Full-text
+  modes, notebook filter, sort, 25/page pagination, CSV export, snippets,
+  index build + progress. Notebooks header box navigates there; result
+  clicks deep-link back (`/notebooks?page=`).
 - Append-to-note: `onenote_append_page` tool + `PATCH /api/pages/{id}/append`
   (plain text in, Graph PATCH commands) + viewer append box with reload.
   16 tools total.
