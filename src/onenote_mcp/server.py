@@ -84,10 +84,22 @@ def try_silent_auth() -> str | None:
 
 
 def load_access_token() -> str | None:
-    """Load access token from file or environment variable."""
+    """Load access token: memory, silent refresh, file, environment.
+
+    Silent refresh comes BEFORE the file because file tokens expire hourly
+    while the MSAL cache (refresh token) survives - otherwise every backend
+    restart + one hour means a dead session and a 401 wall.
+    """
     global _access_token
     if _access_token:
         return _access_token
+
+    # Refresh cache first (no network when the cached token is still valid)
+    try:
+        if (silent := try_silent_auth()) is not None:
+            return silent
+    except Exception as exc:
+        logger.warning("Silent auth attempt failed: %s", exc)
 
     # Try to read from file
     try:
