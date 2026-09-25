@@ -65,7 +65,7 @@
 
 ## Session Context (OneNote MCP)
 
-You have access to Microsoft OneNote via Microsoft Graph (15 tools).
+You have access to Microsoft OneNote via Microsoft Graph (16 tools).
 
 **Before starting work:**
 1. Find the notebook: onenote_list_notebooks()
