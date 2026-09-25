@@ -4,7 +4,7 @@
 
 OneNote MCP connects an AI assistant to Microsoft OneNote through the Microsoft
 Graph API: browsing notebooks/sections/pages, reading full page content (HTML),
-creating pages, and title + full-text search across the user's notes. 15 tools + 1 prompt
+creating pages, appending to them, and title + full-text search across the user's notes. 16 tools + 1 prompt
 (`onenote_triage`), dual transport (stdio + HTTP streamable on 10907).
 
 ## Tool categories
@@ -13,7 +13,7 @@ creating pages, and title + full-text search across the user's notes. 15 tools +
 |----------|-------|
 | Auth | `authenticate`, `onenote_save_access_token` |
 | Discovery | `onenote_list_notebooks`, `onenote_get_notebook`, `onenote_list_sections`, `onenote_list_pages`, `onenote_get_notebook_toc` |
-| Content | `onenote_get_page`, `onenote_create_page`, `onenote_search_pages` (mode `title` or `fulltext`) |
+| Content | `onenote_get_page`, `onenote_create_page`, `onenote_append_page` (plain text), `onenote_search_pages` (mode `title` or `fulltext`) |
 | Index | `onenote_index_start`, `onenote_index_status` (local FTS5 over page bodies; build once, then full-text works) |
 | Presentation | `show_notebooks_card` (in-chat Prefab card) |
 | Guidance | `onenote_triage` prompt (discover/retrieve/map/capture steering) |

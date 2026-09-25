@@ -21,7 +21,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `ONENOTE_LOG_LEVEL` | info | uvicorn log level |
 | `MCP_BRIDGE_URLS` | - | Comma-separated remote MCP URLs proxied via create_proxy |
 
-## MCP tools (15) + prompts (1)
+## MCP tools (16) + prompts (1)
 
 | Tool | Purpose |
 |------|---------|
@@ -33,6 +33,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `onenote_list_pages` | Pages of a section |
 | `onenote_get_page` | Full HTML content of a page |
 | `onenote_create_page` | Create a page with HTML body |
+| `onenote_append_page` | Append plain text to a page |
 | `onenote_search_pages` | Title-match search across notebooks (with notebook/section context); `mode="fulltext"` over the local FTS index |
 | `onenote_index_start` | Build/refresh the local full-text index (background) |
 | `onenote_index_status` | Index build progress and searchable page count |
