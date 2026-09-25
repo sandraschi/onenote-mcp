@@ -46,7 +46,7 @@
   }
 }
 
-.onenote-content { color: rgb(203 213 225); font-size: 0.875rem; line-height: 1.6; }
+.onenote-content { color: rgb(203 213 225); font-size: 0.875rem; line-height: 1.6; position: relative; min-height: 24rem; overflow-x: auto; }
 .onenote-content h1, .onenote-content h2, .onenote-content h3 { color: white; margin: 0.75em 0 0.4em; }
 .onenote-content p { margin: 0.5em 0; }
 .onenote-content a { color: rgb(96 165 250); text-decoration: underline; }
