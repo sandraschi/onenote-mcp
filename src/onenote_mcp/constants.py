@@ -21,12 +21,13 @@ except Exception as exc:
 CLIENT_ID = os.environ.get("ONENOTE_CLIENT_ID", "14d82eec-204b-4c2f-b7e8-296a70dab67e")
 # Fully-qualified base scopes (purpleslurple recipe): the OneNote workload
 # honors these for personal accounts where bare `.All` scopes yield rejected
-# tokens. `offline_access` gives a refresh token for silent re-auth.
+# tokens. NOTE: no `offline_access`/`openid`/`profile` here - MSAL injects
+# those itself and RAISES if you pass them to initiate_auth_code_flow.
+# Device-flow callers append offline_access explicitly (it tolerates it).
 SCOPES = [
     "https://graph.microsoft.com/Notes.Read",
     "https://graph.microsoft.com/Notes.ReadWrite",
     "https://graph.microsoft.com/User.Read",
-    "offline_access",
 ]
 
 # Entra authority. Apps registered for "Personal Microsoft accounts only"

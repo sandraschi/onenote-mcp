@@ -146,8 +146,9 @@ async def authenticate_device_code() -> dict[str, Any]:
     """Start device code authentication flow."""
     app = _msal_app()
 
-    # Get device code
-    flow = app.initiate_device_flow(scopes=SCOPES)
+    # Get device code (offline_access appended: device flow tolerates the
+    # reserved scope and it yields a refresh token for silent re-auth)
+    flow = app.initiate_device_flow(scopes=[*SCOPES, "offline_access"])
     if "user_code" not in flow:
         raise ValueError(f"Failed to create device flow: {flow.get('error_description', flow.get('error', 'unknown'))}")
 
@@ -678,7 +679,7 @@ _auth_flows: dict[str, dict[str, Any]] = {}
 
 def _start_auth_flow() -> dict[str, Any]:
     app = _msal_app()
-    flow = app.initiate_device_flow(scopes=SCOPES)
+    flow = app.initiate_device_flow(scopes=[*SCOPES, "offline_access"])
     if "user_code" not in flow:
         raise ValueError(f"Failed to create device flow: {flow.get('error_description', flow.get('error', 'unknown'))}")
     flow_id = flow.get("device_code", "")[-8:]
