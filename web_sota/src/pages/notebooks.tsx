@@ -71,6 +71,48 @@ export function Notebooks() {
     "modified" | "created" | "title"
   >("modified");
   const [searchNotebook, setSearchNotebook] = useState("");
+  const [searchPage, setSearchPage] = useState(0);
+  const SEARCH_PAGE_SIZE = 25;
+
+  const getVisibleResults = () => {
+    if (!searchResults) return [];
+    return [...searchResults]
+      .filter((p) => !searchNotebook || p.notebook === searchNotebook)
+      .sort((a, b) => {
+        if (searchSort === "title")
+          return (a.title || "").localeCompare(b.title || "");
+        const key =
+          searchSort === "created" ? "createdDateTime" : "lastModifiedDateTime";
+        return (
+          new Date(b[key] || 0).getTime() - new Date(a[key] || 0).getTime()
+        );
+      });
+  };
+
+  const exportSearchCsv = () => {
+    const rows = getVisibleResults();
+    const esc = (v?: string) => `"${(v || "").replace(/"/g, '""')}"`;
+    const csv = [
+      "title,notebook,section,created,modified",
+      ...rows.map((p) =>
+        [
+          esc(p.title),
+          esc(p.notebook),
+          esc(p.section),
+          esc(p.createdDateTime),
+          esc(p.lastModifiedDateTime),
+        ].join(","),
+      ),
+    ].join("\n");
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `onenote-search-${query.trim() || "results"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
@@ -245,6 +287,7 @@ export function Notebooks() {
     }
     setSearching(true);
     setError("");
+    setSearchPage(0);
     try {
       const data = await fetchJson<{
         success: boolean;
@@ -404,15 +447,18 @@ export function Notebooks() {
         <div className="rounded-lg border border-slate-800 bg-slate-950/50 overflow-hidden">
           <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-slate-800">
             <p className="text-sm text-slate-300 mr-auto">
-              {searchResults.length} result
-              {searchResults.length !== 1 ? "s" : ""} for "{query}"
+              {getVisibleResults().length} result
+              {getVisibleResults().length !== 1 ? "s" : ""} for "{query}"
             </p>
             <select
               data-testid="search-notebook-filter"
               aria-label="Filter by notebook"
               className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300"
               value={searchNotebook}
-              onChange={(e) => setSearchNotebook(e.target.value)}
+              onChange={(e) => {
+                setSearchNotebook(e.target.value);
+                setSearchPage(0);
+              }}
             >
               <option value="">All notebooks</option>
               {[
@@ -430,11 +476,12 @@ export function Notebooks() {
               aria-label="Sort results"
               className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300"
               value={searchSort}
-              onChange={(e) =>
+              onChange={(e) => {
                 setSearchSort(
                   e.target.value as "modified" | "created" | "title",
-                )
-              }
+                );
+                setSearchPage(0);
+              }}
             >
               <option value="modified">Recently modified</option>
               <option value="created">Recently created</option>
@@ -442,61 +489,99 @@ export function Notebooks() {
             </select>
             <button
               type="button"
+              data-testid="search-export"
+              title="Export filtered results as CSV"
+              className="h-8 rounded border border-slate-700 px-2 text-sm text-slate-300 hover:bg-slate-800"
+              onClick={exportSearchCsv}
+            >
+              Export
+            </button>
+            <button
+              type="button"
               className="text-slate-400 hover:text-slate-200"
               onClick={() => {
                 setSearchResults(null);
                 setQuery("");
                 setSearchNotebook("");
+                setSearchPage(0);
               }}
             >
               <X className="h-4 w-4" />
             </button>
           </div>
-          {searchResults.length === 0 ? (
+          {getVisibleResults().length === 0 ? (
             <p className="p-4 text-sm text-slate-400">No matching pages.</p>
           ) : (
-            <ul className="divide-y divide-slate-800/60">
-              {[...searchResults]
-                .filter((p) => !searchNotebook || p.notebook === searchNotebook)
-                .sort((a, b) => {
-                  if (searchSort === "title")
-                    return (a.title || "").localeCompare(b.title || "");
-                  const key =
-                    searchSort === "created"
-                      ? "createdDateTime"
-                      : "lastModifiedDateTime";
-                  return (
-                    new Date(b[key] || 0).getTime() -
-                    new Date(a[key] || 0).getTime()
-                  );
-                })
-                .map((p) => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      className="w-full text-left px-4 py-2.5 hover:bg-slate-900/40 flex items-center justify-between gap-3"
-                      onClick={() => openPage(p.id)}
-                    >
-                      <span className="text-sm text-slate-200 truncate">
-                        <FileText className="h-3.5 w-3.5 inline mr-1.5 text-blue-400" />
-                        {p.title || "(untitled)"}
-                        {p.notebook && (
-                          <span className="text-slate-400">
-                            {" "}
-                            · {p.notebook}
-                          </span>
-                        )}
-                        {p.section && (
-                          <span className="text-slate-500"> / {p.section}</span>
-                        )}
-                      </span>
-                      <span className="text-xs text-slate-400 shrink-0">
-                        {fmtDate(p.lastModifiedDateTime)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-            </ul>
+            <>
+              <ul className="divide-y divide-slate-800/60">
+                {getVisibleResults()
+                  .slice(
+                    searchPage * SEARCH_PAGE_SIZE,
+                    searchPage * SEARCH_PAGE_SIZE + SEARCH_PAGE_SIZE,
+                  )
+                  .map((p) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-900/40 flex items-center justify-between gap-3"
+                        onClick={() => openPage(p.id)}
+                      >
+                        <span className="text-sm text-slate-200 truncate">
+                          <FileText className="h-3.5 w-3.5 inline mr-1.5 text-blue-400" />
+                          {p.title || "(untitled)"}
+                          {p.notebook && (
+                            <span className="text-slate-400">
+                              {" "}
+                              · {p.notebook}
+                            </span>
+                          )}
+                          {p.section && (
+                            <span className="text-slate-500">
+                              {" "}
+                              / {p.section}
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-xs text-slate-400 shrink-0">
+                          {fmtDate(p.lastModifiedDateTime)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+              {getVisibleResults().length > SEARCH_PAGE_SIZE && (
+                <div className="flex items-center justify-between px-4 py-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    data-testid="search-prev"
+                    className="h-8 rounded border border-slate-700 px-3 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={searchPage === 0}
+                    onClick={() => setSearchPage((p) => Math.max(0, p - 1))}
+                  >
+                    Prev
+                  </button>
+                  <p
+                    data-testid="search-page-info"
+                    className="text-sm text-slate-400"
+                  >
+                    Page {searchPage + 1} of{" "}
+                    {Math.ceil(getVisibleResults().length / SEARCH_PAGE_SIZE)}
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="search-next"
+                    className="h-8 rounded border border-slate-700 px-3 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={
+                      (searchPage + 1) * SEARCH_PAGE_SIZE >=
+                      getVisibleResults().length
+                    }
+                    onClick={() => setSearchPage((p) => p + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
