@@ -99,7 +99,9 @@ export function Notebooks() {
     setError("");
     // Open the tab synchronously in the click gesture: window.open after an
     // await is outside the gesture and popup blockers kill it silently.
-    const tab = window.open("about:blank", "_blank", "noopener");
+    // NOTE: no "noopener" - with it the opener gets a neutered reference and
+    // the later location assignment silently fails, stranding about:blank.
+    const tab = window.open("about:blank", "_blank");
     try {
       // Browser redirect login (auth-code flow): device-code tokens are
       // rejected by the OneNote workload for personal accounts.
