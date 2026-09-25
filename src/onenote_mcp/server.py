@@ -137,7 +137,9 @@ async def get_graph_client() -> httpx.AsyncClient:
         raise ValueError("No access token available. Please sign in first (Notebooks page, blue button).")
 
     _graph_client = httpx.AsyncClient(
-        base_url="https://graph.microsoft.com/v1.0", headers={"Authorization": f"Bearer {token}"}
+        base_url="https://graph.microsoft.com/v1.0",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30.0,
     )
     return _graph_client
 
@@ -278,7 +280,7 @@ async def search_pages(query: str) -> list[Page]:
     hits: list[Page] = []
     for nb in notebooks:
         try:
-            toc = await get_notebook_toc(nb.id)
+            toc, _ = await get_notebook_toc(nb.id)
         except Exception as exc:
             logger.warning("TOC walk skipped notebook %s: %s", nb.id, exc)
             continue
@@ -295,16 +297,25 @@ async def search_pages(query: str) -> list[Page]:
     return hits
 
 
-async def get_notebook_toc(notebook_id: str) -> TOCData:
-    """Generate table of contents for a notebook (sections fetched in parallel)."""
+async def get_notebook_toc(notebook_id: str) -> tuple[TOCData, list[str]]:
+    """Generate table of contents for a notebook (sections fetched in parallel).
+
+    Returns (toc, warnings): slow/failing sections are skipped with a warning
+    instead of failing the whole notebook (one 5s-timeout section must not
+    torpedo a big TOC).
+    """
     notebook = await get_notebook(notebook_id)
     sections = await list_sections(notebook_id)
 
-    semaphore = asyncio.Semaphore(6)
+    semaphore = asyncio.Semaphore(4)
 
-    async def _section_pages(section: Section) -> TOCSection:
-        async with semaphore:
-            pages = await list_pages(section.id)
+    async def _section_pages(section: Section) -> TOCSection | None:
+        try:
+            async with semaphore:
+                pages = await list_pages(section.id)
+        except Exception as exc:
+            logger.warning("TOC skipped slow section %s: %s", section.displayName, exc)
+            return None
         return TOCSection(
             name=section.displayName,
             pageCount=len(pages),
@@ -319,14 +330,20 @@ async def get_notebook_toc(notebook_id: str) -> TOCData:
             ],
         )
 
-    toc_sections = await asyncio.gather(*(_section_pages(s) for s in sections))
+    results = await asyncio.gather(*(_section_pages(s) for s in sections))
+    toc_sections = [r for r in results if r is not None]
     total_pages = sum(s.pageCount for s in toc_sections)
+    warnings = (
+        [f"{len(sections) - len(toc_sections)} section(s) skipped (timed out)"]
+        if len(toc_sections) != len(sections)
+        else []
+    )
 
     return TOCData(
         notebook=notebook.displayName,
         stats={"sections": len(sections), "pages": total_pages},
         sections=list(toc_sections),
-    )
+    ), warnings
 
 
 # Create FastMCP app
@@ -918,8 +935,8 @@ async def api_list_notebooks(request: Request) -> JSONResponse:
 async def api_notebook_toc(request: Request) -> JSONResponse:
     notebook_id = request.path_params["notebook_id"]
     try:
-        toc = await get_notebook_toc(notebook_id)
-        return JSONResponse({"success": True, "toc": toc.model_dump()})
+        toc, warnings = await get_notebook_toc(notebook_id)
+        return JSONResponse({"success": True, "toc": toc.model_dump(), "warnings": warnings})
     except Exception as exc:
         return _error_response(exc)
 
@@ -1222,7 +1239,7 @@ async def onenote_get_notebook_toc(notebook_id: Annotated[str, Field(description
     onenote_get_notebook_toc(notebook_id="0-ABC123...")
     """
     try:
-        toc = await get_notebook_toc(notebook_id)
+        toc, warnings = await get_notebook_toc(notebook_id)
 
         result = f"""📚 Table of Contents: {toc.notebook}
 
@@ -1239,6 +1256,8 @@ async def onenote_get_notebook_toc(notebook_id: Annotated[str, Field(description
 
             result += "\n"
 
+        if warnings:
+            result += "\n⚠️ " + " ".join(warnings) + "\n"
         return result
     except Exception as e:
         return f"❌ Failed to generate TOC: {e!s}"

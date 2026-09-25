@@ -59,6 +59,7 @@ export function Notebooks() {
   const [selectedNotebook, setSelectedNotebook] = useState<string | null>(null);
   const [toc, setToc] = useState<TocData | null>(null);
   const [tocLoading, setTocLoading] = useState(false);
+  const [tocWarnings, setTocWarnings] = useState<string[]>([]);
   const [selectedPage, setSelectedPage] = useState<PageDetail | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -193,6 +194,7 @@ export function Notebooks() {
   const loadToc = async (notebookId: string) => {
     setSelectedNotebook(notebookId);
     setToc(null);
+    setTocWarnings([]);
     setSelectedPage(null);
     setTocLoading(true);
     setError("");
@@ -200,6 +202,7 @@ export function Notebooks() {
       const data = await fetchJson<{
         success: boolean;
         toc?: TocData;
+        warnings?: string[];
         error?: string;
       }>(
         `/notebooks/${encodeURIComponent(notebookId)}/toc`,
@@ -208,6 +211,7 @@ export function Notebooks() {
       );
       if (!data.success) throw new Error(data.error || "Failed to load TOC");
       setToc(data.toc || null);
+      setTocWarnings(data.warnings || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -542,6 +546,15 @@ export function Notebooks() {
               <p className="px-4 py-1.5 text-xs text-slate-400 border-t border-slate-800">
                 {toc.stats.sections} sections · {toc.stats.pages} pages
               </p>
+              {tocWarnings.length > 0 && (
+                <p
+                  data-testid="toc-warnings"
+                  className="px-4 py-1.5 text-xs text-amber-300 border-t border-slate-800"
+                >
+                  Partial load: {tocWarnings.join(" ")} — retry to fetch the
+                  rest.
+                </p>
+              )}
               {toc.sections.map((sec) => (
                 <div key={sec.name}>
                   <p className="px-4 py-1.5 text-sm font-medium text-slate-300 flex items-center gap-1.5">
