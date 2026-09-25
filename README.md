@@ -42,7 +42,9 @@ just serve       # backend :10907 + webapp :10906, browser opens itself
 ```
 
 First run: open the Notebooks page → **Sign in with Microsoft** (free app
-registration, personal accounts OK). Full paths: [INSTALL.md](INSTALL.md),
+registration, personal accounts OK) — once. The backend renews the session
+itself every hour, so you stay signed in for ~90 days without touching
+anything. Full paths: [INSTALL.md](INSTALL.md),
 [docs/ONBOARDING.md](docs/ONBOARDING.md).
 
 ## Example Prompts
