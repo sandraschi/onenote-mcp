@@ -22,12 +22,13 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 
+from . import search_index
 from .constants import AUTHORITY, CLIENT_ID, SCOPES, TOKEN_FILE_NAME
 from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("onenote_mcp")
-_SERVER_VERSION = "1.0.0"
+_SERVER_VERSION = "1.0.3"
 _START_TIME = time.monotonic()
 
 # Fire-and-forget shutdown tasks (stored to satisfy RUF006)
@@ -411,6 +412,8 @@ _TOOL_REGISTRY: tuple[str, ...] = (
     "onenote_get_page",
     "onenote_create_page",
     "onenote_search_pages",
+    "onenote_index_start",
+    "onenote_index_status",
     "onenote_get_notebook_toc",
     "show_notebooks_card",
     "onenote_help",
@@ -966,13 +969,64 @@ async def api_get_page(request: Request) -> JSONResponse:
 @app.custom_route("/api/search", methods=["GET"])
 async def api_search_pages(request: Request) -> JSONResponse:
     query = request.query_params.get("q", "")
+    mode = request.query_params.get("mode", "title")
     if not query:
         return JSONResponse({"success": False, "error": "q query param required"}, status_code=400)
     try:
+        if mode == "fulltext":
+            hits = search_index.search_fulltext(query)
+            if not hits and search_index.index_count() == 0:
+                return JSONResponse(
+                    {
+                        "success": True,
+                        "query": query,
+                        "mode": "fulltext",
+                        "pages": [],
+                        "warning": "Full-text index is empty - build it (POST /api/index) or use mode=title.",
+                    }
+                )
+            return JSONResponse(
+                {"success": True, "query": query, "mode": "fulltext", "pages": [h.model_dump() for h in hits]}
+            )
         pages = await search_pages(query)
-        return JSONResponse({"success": True, "query": query, "pages": [p.model_dump() for p in pages]})
+        return JSONResponse(
+            {"success": True, "query": query, "mode": "title", "pages": [p.model_dump() for p in pages]}
+        )
     except Exception as exc:
         return _error_response(exc)
+
+
+async def _page_html(page_id: str) -> str:
+    return (await get_page(page_id)).content or ""
+
+
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
+def _spawn_index_build() -> bool:
+    """Start the FTS index build unless one runs. Returns True if started."""
+    if search_index.job_status()["state"] == "running":
+        return False
+    task = asyncio.create_task(
+        search_index.build_index(list_notebooks, get_notebook_toc, _page_html),
+        name="onenote-fts-index",
+    )
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    return True
+
+
+@app.custom_route("/api/index", methods=["POST"])
+async def api_index_start(request: Request) -> JSONResponse:
+    """Start (or restart) the full-text index build in the background."""
+    if not _spawn_index_build():
+        return JSONResponse({"success": True, "status": "already running"})
+    return JSONResponse({"success": True, "status": "started"})
+
+
+@app.custom_route("/api/index/status", methods=["GET"])
+async def api_index_status(request: Request) -> JSONResponse:
+    return JSONResponse({"success": True, **search_index.job_status()})
 
 
 @app.custom_route("/api/pages", methods=["POST"])
@@ -1212,30 +1266,87 @@ async def onenote_create_page(
 
 
 @app.tool(annotations=_READONLY)
-async def onenote_search_pages(query: Annotated[str, Field(description="Search query string")]) -> str:
+async def onenote_search_pages(
+    query: Annotated[str, Field(description="Search query string")],
+    mode: Annotated[
+        str,
+        Field(
+            description="Search mode: 'title' (always available) or 'fulltext' (needs the index; see onenote_index_start)"
+        ),
+    ] = "title",
+) -> str:
     """Search for pages across all OneNote notebooks.
+
+    Two modes: 'title' matches page titles via TOC walk (always available);
+    'fulltext' queries the local FTS index over page bodies (build it first).
 
     ## Return Format
     Markdown string: "🔍 Search Results for '<query>':" with numbered matching pages.
 
     ## Examples
     onenote_search_pages(query="quarterly report")
+    onenote_search_pages(query="hiking checklist", mode="fulltext")
     """
     try:
-        pages = await search_pages(query)
-        if not pages:
+        items: list[tuple[str, str, str, str, str]] = []
+        if mode == "fulltext":
+            for hit in search_index.search_fulltext(query):
+                items.append((hit.title, hit.id, hit.notebook, hit.section, hit.snippet))
+            if not items and search_index.index_count() == 0:
+                return "Full-text index is empty - run onenote_index_start first (or search mode='title')."
+        else:
+            for page in await search_pages(query):
+                items.append((page.title, page.id, page.notebook or "", page.section or "", ""))
+        if not items:
             return f"No pages found matching query: '{query}'"
 
         result = f"🔍 Search Results for '{query}':\n\n"
-        for i, page in enumerate(pages, 1):
-            result += f"{i}. **{page.title}**\n"
-            result += f"   ID: `{page.id}`\n"
-            result += f"   Created: {page.createdDateTime}\n"
-            result += f"   Modified: {page.lastModifiedDateTime}\n\n"
+        for i, (title, pid, notebook, section, snippet) in enumerate(items, 1):
+            where = f"{notebook} / {section}".strip(" /")
+            result += f"{i}. **{title}**" + (f" ({where})" if where else "") + "\n"
+            result += f"   ID: `{pid}`\n"
+            if snippet:
+                result += f"   …{snippet}…\n"
+            result += "\n"
 
         return result
     except Exception as e:
         return f"❌ Search failed: {e!s}"
+
+
+@app.tool(annotations=_READONLY)
+async def onenote_index_start() -> str:
+    """Build (or refresh) the local full-text search index.
+
+    Walks all notebooks and indexes page bodies into SQLite FTS5 (skips
+    unchanged pages). Runs in the background - check onenote_index_status.
+
+    ## Return Format
+    Markdown string confirming started/already-running.
+
+    ## Examples
+    onenote_index_start()
+    """
+    if not _spawn_index_build():
+        return "Index build already running - check onenote_index_status."
+    return "Index build started in the background - check onenote_index_status for progress."
+
+
+@app.tool(annotations=_READONLY)
+async def onenote_index_status() -> str:
+    """Show full-text index build progress and coverage.
+
+    ## Return Format
+    Markdown string with state, pages done/total, indexed page count.
+
+    ## Examples
+    onenote_index_status()
+    """
+    st = search_index.job_status()
+    return (
+        f"Index state: {st['state']} - {st['done']}/{st['total']} processed, "
+        f"{st['indexed_pages']} pages searchable." + (f" Error: {st['error']}" if st.get("error") else "")
+    )
 
 
 @app.tool(annotations=_READONLY)
@@ -1302,7 +1413,7 @@ async def onenote_help() -> str:
     """List the available OneNote MCP tools and when to use each.
 
     ## Return Format
-    Markdown string enumerating the 13 tools with one-line usage notes.
+    Markdown string enumerating the 15 tools with one-line usage notes.
 
     ## Examples
     onenote_help()
@@ -1316,7 +1427,9 @@ async def onenote_help() -> str:
 - `onenote_list_pages` - pages of a section
 - `onenote_get_page` - full HTML content of a page
 - `onenote_create_page` - add a page with HTML body
-- `onenote_search_pages` - title-match search across notebooks
+- `onenote_search_pages` - title or full-text search across notebooks
+- `onenote_index_start` - build the full-text index (background)
+- `onenote_index_status` - index progress and coverage
 - `onenote_get_notebook_toc` - sections + pages overview
 - `show_notebooks_card` - notebooks as an in-chat Prefab card
 - `shutdown_server` - stop the server"""

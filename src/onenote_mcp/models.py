@@ -65,3 +65,15 @@ class TOCData(BaseModel):
     notebook: str
     stats: dict[str, int] = Field(default_factory=lambda: {"sections": 0, "pages": 0})
     sections: list[TOCSection] = Field(default_factory=list)
+
+
+class SearchHit(BaseModel):
+    """Lightweight full-text search hit (no live fetch needed)."""
+
+    id: str
+    title: str = ""
+    notebook: str = ""
+    section: str = ""
+    createdDateTime: str = ""
+    lastModifiedDateTime: str = ""
+    snippet: str = ""
