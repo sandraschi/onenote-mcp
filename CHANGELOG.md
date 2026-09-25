@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.4] - 2026-09-25
 
 ### Assfix 2026-09-25 (66 -> ~85, SOTA)
 - `data/` + `*.sqlite3` + `.coverage` gitignored (index DB must never commit).
