@@ -267,10 +267,22 @@ async def create_page(notebook_id: str, title: str, content: str) -> dict[str, A
 
 
 async def search_pages(query: str) -> list[Page]:
-    """Search for pages across all notebooks."""
+    """Search for pages across all notebooks.
+
+    Microsoft removed full-text OneNote $search; title-contains $filter is
+    what remains. Tries $search first (works on some tenants), falls back
+    to title $filter on 400.
+    """
+    from urllib.parse import quote as _quote
+
     client = await get_graph_client()
-    response = await client.get(f"/me/onenote/pages?search={query}")
-    response.raise_for_status()
+    try:
+        response = await client.get(f"/me/onenote/pages?search={_quote(query)}")
+        response.raise_for_status()
+    except Exception:
+        safe = query.replace("'", "''")
+        response = await client.get(f"/me/onenote/pages?$filter=contains(title,'{_quote(safe, safe='')}')")
+        response.raise_for_status()
 
     data = response.json()
     pages = []
