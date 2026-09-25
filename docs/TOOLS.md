@@ -1,10 +1,10 @@
 # Tools
 
-## MCP tools (12)
+## MCP tools (13) + prompt (`onenote_triage`)
 
 | Tool | Purpose |
 |------|---------|
-| `authenticate` | Start Microsoft device-code login flow. |
+| `authenticate` | Sign in with Microsoft (device-code flow). |
 | `onenote_save_access_token` | Store a Graph access token manually. |
 | `onenote_list_notebooks` | List all accessible notebooks. |
 | `onenote_get_notebook` | Details for one notebook. |
@@ -34,7 +34,11 @@ All tools are read-only except `onenote_create_page` (MUTATING),
 | `GET /api/v1/diagnostics` | Tool list + system info (CUA smoke test). |
 | `POST /api/shutdown` | Graceful shutdown. |
 | `GET /api/logs`, `DELETE /api/logs`, `GET /api/logs/stats`, `GET /api/logs/export` | Ring-buffer activity log. |
-| `POST /api/auth/device`, `GET /api/auth/poll`, `GET /api/auth/status` | Non-blocking device-code auth. |
+| `POST /api/auth/device`, `GET /api/auth/poll`, `GET /api/auth/status` | Non-blocking device-code auth (fallback). |
+| `GET /api/auth/login`, `GET /api/auth/callback` | Browser auth-code sign-in (primary). |
+| `GET /api/auth/debug` | Auth diagnostics: client suffix, authority, scopes, token shape/age, JWT claims (no secrets). |
+| `GET /api/llm/providers`, `GET /api/llm/models`, `GET /api/llm/onboarding` | LLM registry + onboarding facts. |
+| `POST /api/llm/chat` | Backend chat proxy (Ollama + OpenAI-compatible). |
 | `GET /api/notebooks` | Notebook list. |
 | `GET /api/notebooks/{id}/toc` | Notebook table of contents. |
 | `GET /api/pages/{id}` | Page content. |

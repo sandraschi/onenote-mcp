@@ -7,7 +7,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 
 - Backend port: 10907 (REST `/api/*` + MCP `/mcp`)
 - Webapp port: 10906 (Vite dev, proxies `/api` -> 10907)
-- Auth: Microsoft device-code flow; token persisted to repo-root token file
+- Auth: browser auth-code sign-in (primary) + device-code fallback; token persisted to repo-root token file, refresh cache enables silent re-auth
 - Repo layout: `src/onenote_mcp/` (server, transport, models, activity log), `web_sota/` (React), `native/` (Tauri)
 
 ## Environment variables
@@ -25,7 +25,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 
 | Tool | Purpose |
 |------|---------|
-| `authenticate` | Start Microsoft device-code login flow |
+| `authenticate` | Sign in with Microsoft (device-code flow) |
 | `onenote_save_access_token` | Persist a Graph token manually |
 | `onenote_list_notebooks` | List all notebooks |
 | `onenote_get_notebook` | Notebook details (name, URLs) |
@@ -48,7 +48,9 @@ Prompt: `onenote_triage` - guided DISCOVER/RETRIEVE/MAP/CAPTURE triage.
 - `GET /api/capabilities` — feature flags + tool names
 - `GET /api/v1/diagnostics` — tool list, system info (CUA-NSIS smoke)
 - `GET /api/logs`, `DELETE /api/logs`, `GET /api/logs/stats`, `GET /api/logs/export` — activity ring buffer
-- `POST /api/auth/device`, `GET /api/auth/poll`, `GET /api/auth/status` — device-code auth UI
+- `POST /api/auth/device`, `GET /api/auth/poll`, `GET /api/auth/status` — device-code auth UI (fallback)
+- `GET /api/auth/login`, `GET /api/auth/callback` — browser auth-code sign-in (primary)
+- `GET /api/auth/debug` — auth diagnostics (no secrets)
 - `GET /api/notebooks`, `GET /api/notebooks/{id}/toc` — notebook browser
 - `GET /api/pages/{id}`, `POST /api/pages`, `GET /api/search?q=` — page content/creation/search
 - `GET /api/skills`, `GET /api/skills/{name}` — skills list + SKILL.md content

@@ -106,7 +106,7 @@ The first time you ask about OneNote, the AI will guide you through the authenti
 
 ## Features
 
-- Authentication with Microsoft OneNote using device code flow (no Azure setup needed)
+- Authentication with Microsoft OneNote (browser sign-in primary, device-code fallback; no Azure subscription needed - free app registration)
 - List all notebooks, sections, and pages
 - Create new pages with HTML content
 - Read complete page content, including HTML formatting
@@ -178,22 +178,13 @@ Use the "authenticate" tool to start the authentication flow,
 or use "onenote_save_access_token" if you already have a token.
 ```
 
-### Step 4: Authenticate Through Your AI Assistant
+### Step 4: Sign in
 
-Once the server is running, you can authenticate directly through your AI assistant:
-
-1. In Cursor, Anthropic's Claude Desktop, or any MCP-compatible assistant, ask to authenticate with OneNote:
-   ```
-   Can you authenticate with my OneNote account?
-   ```
-
-2. The AI will trigger the authentication flow and provide you with:
-   - A URL (typically microsoft.com/devicelogin)
-   - A code to enter
-
-3. Go to the URL, enter the code, and sign in with your Microsoft account
-
-4. After successful authentication, you can start using OneNote with your AI assistant
+Two paths, same result. **Webapp (recommended):** open the Notebooks page and
+click **Sign in with Microsoft** - a browser tab opens, approve, done.
+**Via AI assistant:** ask it to authenticate with OneNote; the `authenticate`
+tool runs the device-code flow (URL + code). See `docs/ONBOARDING.md` for the
+one-time app registration and `docs/ARCHITECTURE.md` for the full auth chain.
 
 ## Available MCP Tools
 
@@ -201,7 +192,7 @@ Once authenticated, the following tools are available for AI assistants to use:
 
 | Tool Name | Description |
 |-----------|-------------|
-| `authenticate` | Start the Microsoft authentication flow |
+| `authenticate` | Sign in with Microsoft (device-code flow) |
 | `onenote_list_notebooks` | Get a list of all your OneNote notebooks |
 | `onenote_get_notebook` | Get details of a specific notebook |
 | `onenote_list_sections` | List all sections in a notebook |
@@ -282,9 +273,16 @@ python -c "from onenote_mcp.server import authenticate_device_code; print('Authe
 
 ### Authentication Issues
 
-- If authentication fails, make sure you're using a modern browser without tracking prevention
-- Try clearing browser cookies and cache
-- If you get "expired_token" errors, restart the authentication process
+- Prefer the webapp Notebooks page (**Sign in with Microsoft**, browser flow).
+  Device-code is the fallback (`authenticate` tool).
+- If sign-in fails, use a modern browser without tracking prevention; try
+  clearing cookies/cache.
+- "expired_token"/401s: sign in again (silent re-auth covers valid refresh
+  windows). After portal permission changes, revoke the app at
+  account.live.com consent management first.
+- `GET /api/auth/debug` shows client, authority, scopes, token shape/age
+  (no secrets). Full chain: `docs/ARCHITECTURE.md`; war stories:
+  `docs/AUTH_INVESTIGATION.md`.
 
 ### Server Won't Start
 
@@ -300,10 +298,12 @@ python -c "from onenote_mcp.server import authenticate_device_code; print('Authe
 
 ## Security Notes
 
-- Authentication tokens are stored locally in `.access-token.txt`
+- Sign-in tokens are stored locally in `.access-token.txt`, refresh cache in
+  `.msal-token-cache.bin` (both gitignored - never commit them)
 - Tokens grant access to your OneNote data, so keep them secure
-- Tokens expire after some time, requiring re-authentication
-- No Azure setup or API keys are required
+- Silent re-auth covers expiry while the refresh cache is valid; otherwise
+  sign in again
+- No Azure subscription needed (free app registration, personal accounts OK)
 
 ## Credits
 
