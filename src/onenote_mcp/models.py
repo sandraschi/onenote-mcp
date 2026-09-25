@@ -38,6 +38,8 @@ class Page(BaseModel):
     self: str
     contentUrl: str
     content: str | None = None
+    notebook: str | None = None
+    section: str | None = None
 
 
 class TOCPage(BaseModel):

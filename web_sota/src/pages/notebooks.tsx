@@ -39,6 +39,8 @@ type SearchResult = {
   title: string;
   createdDateTime: string;
   lastModifiedDateTime: string;
+  notebook?: string;
+  section?: string;
 };
 
 function fmtDate(iso?: string): string {
@@ -64,6 +66,10 @@ export function Notebooks() {
     null,
   );
   const [searching, setSearching] = useState(false);
+  const [searchSort, setSearchSort] = useState<
+    "modified" | "created" | "title"
+  >("modified");
+  const [searchNotebook, setSearchNotebook] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
@@ -308,7 +314,7 @@ export function Notebooks() {
             <input
               data-testid="notebook-search"
               className="bg-slate-900 border border-slate-700 rounded-md pl-8 pr-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 w-64"
-              placeholder="Search pages..."
+              placeholder="Search in pages..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && runSearch()}
@@ -392,17 +398,51 @@ export function Notebooks() {
 
       {searchResults && (
         <div className="rounded-lg border border-slate-800 bg-slate-950/50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
-            <p className="text-sm text-slate-300">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-slate-800">
+            <p className="text-sm text-slate-300 mr-auto">
               {searchResults.length} result
               {searchResults.length !== 1 ? "s" : ""} for "{query}"
             </p>
+            <select
+              data-testid="search-notebook-filter"
+              aria-label="Filter by notebook"
+              className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300"
+              value={searchNotebook}
+              onChange={(e) => setSearchNotebook(e.target.value)}
+            >
+              <option value="">All notebooks</option>
+              {[
+                ...new Set(
+                  searchResults.map((p) => p.notebook).filter(Boolean),
+                ),
+              ].map((nb) => (
+                <option key={nb} value={nb}>
+                  {nb}
+                </option>
+              ))}
+            </select>
+            <select
+              data-testid="search-sort"
+              aria-label="Sort results"
+              className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300"
+              value={searchSort}
+              onChange={(e) =>
+                setSearchSort(
+                  e.target.value as "modified" | "created" | "title",
+                )
+              }
+            >
+              <option value="modified">Recently modified</option>
+              <option value="created">Recently created</option>
+              <option value="title">Title A-Z</option>
+            </select>
             <button
               type="button"
               className="text-slate-400 hover:text-slate-200"
               onClick={() => {
                 setSearchResults(null);
                 setQuery("");
+                setSearchNotebook("");
               }}
             >
               <X className="h-4 w-4" />
@@ -412,23 +452,46 @@ export function Notebooks() {
             <p className="p-4 text-sm text-slate-400">No matching pages.</p>
           ) : (
             <ul className="divide-y divide-slate-800/60">
-              {searchResults.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-2.5 hover:bg-slate-900/40 flex items-center justify-between gap-3"
-                    onClick={() => openPage(p.id)}
-                  >
-                    <span className="text-sm text-slate-200 truncate">
-                      <FileText className="h-3.5 w-3.5 inline mr-1.5 text-blue-400" />
-                      {p.title || "(untitled)"}
-                    </span>
-                    <span className="text-xs text-slate-400 shrink-0">
-                      {fmtDate(p.lastModifiedDateTime)}
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {[...searchResults]
+                .filter((p) => !searchNotebook || p.notebook === searchNotebook)
+                .sort((a, b) => {
+                  if (searchSort === "title")
+                    return (a.title || "").localeCompare(b.title || "");
+                  const key =
+                    searchSort === "created"
+                      ? "createdDateTime"
+                      : "lastModifiedDateTime";
+                  return (
+                    new Date(b[key] || 0).getTime() -
+                    new Date(a[key] || 0).getTime()
+                  );
+                })
+                .map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 hover:bg-slate-900/40 flex items-center justify-between gap-3"
+                      onClick={() => openPage(p.id)}
+                    >
+                      <span className="text-sm text-slate-200 truncate">
+                        <FileText className="h-3.5 w-3.5 inline mr-1.5 text-blue-400" />
+                        {p.title || "(untitled)"}
+                        {p.notebook && (
+                          <span className="text-slate-400">
+                            {" "}
+                            · {p.notebook}
+                          </span>
+                        )}
+                        {p.section && (
+                          <span className="text-slate-500"> / {p.section}</span>
+                        )}
+                      </span>
+                      <span className="text-xs text-slate-400 shrink-0">
+                        {fmtDate(p.lastModifiedDateTime)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
             </ul>
           )}
         </div>

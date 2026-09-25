@@ -286,7 +286,10 @@ async def search_pages(query: str) -> list[Page]:
             for toc_page in section.pages:
                 if needle in (toc_page.title or "").lower():
                     try:
-                        hits.append(await get_page(toc_page.id))
+                        hit = await get_page(toc_page.id)
+                        hit.notebook = nb.displayName
+                        hit.section = section.name
+                        hits.append(hit)
                     except Exception as exc:
                         logger.warning("Search skipped page %s: %s", toc_page.id, exc)
     return hits
