@@ -212,13 +212,20 @@ async def list_pages(section_id: str) -> list[Page]:
 
 
 async def get_page(page_id: str) -> Page:
-    """Get complete content of a specific page."""
+    """Get complete content of a specific page (metadata + HTML body)."""
     client = await get_graph_client()
     response = await client.get(f"/me/onenote/pages/{page_id}")
     response.raise_for_status()
 
     page_data = response.json()
-    content = response.text  # Get HTML content
+    # The metadata endpoint has no body - the HTML lives at .../content.
+    content = ""
+    try:
+        cr = await client.get(f"/me/onenote/pages/{page_id}/content", headers={"Accept": "text/html"})
+        cr.raise_for_status()
+        content = cr.text
+    except Exception as exc:
+        logger.warning("Page content fetch failed for %s: %s", page_id, exc)
 
     return Page(
         id=page_data["id"],
