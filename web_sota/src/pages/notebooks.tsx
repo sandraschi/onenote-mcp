@@ -97,6 +97,29 @@ export function Notebooks() {
       });
   };
 
+  const appendToPage = async () => {
+    if (!selectedPage || !appendText.trim()) return;
+    setAppending(true);
+    setError("");
+    try {
+      const data = await fetchJson<{ success: boolean; error?: string }>(
+        `/pages/${encodeURIComponent(selectedPage.id)}/append`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ content: appendText }),
+        },
+      );
+      if (!data.success) throw new Error(data.error || "Append failed");
+      setAppendText("");
+      setNotice("Appended - reloading the page.");
+      await openPage(selectedPage.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAppending(false);
+    }
+  };
+
   const exportSearchCsv = () => {
     const rows = getVisibleResults();
     const esc = (v?: string) => `"${(v || "").replace(/"/g, '""')}"`;
@@ -125,6 +148,8 @@ export function Notebooks() {
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [creating, setCreating] = useState(false);
+  const [appendText, setAppendText] = useState("");
+  const [appending, setAppending] = useState(false);
   const [notice, setNotice] = useState("");
   const [authOk, setAuthOk] = useState<boolean | null>(null);
   const [authFlow, setAuthFlow] = useState<{
@@ -801,6 +826,26 @@ export function Notebooks() {
                 className="p-4 overflow-y-auto prose-invert onenote-content"
                 dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
               />
+              <div className="px-4 py-3 border-t border-slate-800 space-y-2">
+                <textarea
+                  data-testid="page-append-input"
+                  className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 h-20 resize-none"
+                  value={appendText}
+                  onChange={(e) => setAppendText(e.target.value)}
+                  placeholder="Type to append to this note (plain text, blank lines = paragraphs)..."
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    data-testid="page-append-btn"
+                    className="text-sm px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={appending || !appendText.trim()}
+                    onClick={appendToPage}
+                  >
+                    {appending ? "Appending..." : "Append to note"}
+                  </button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-2">
