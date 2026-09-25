@@ -111,6 +111,21 @@ Net: nobody beats our feature set (13 tools + webapp + Tauri + MCPB); the
 auth wall hits everyone using custom-app tokens the same way. ask-marcel is
 the pragmatic unblock, not a replacement.
 
+## Resolution (2026-09-25)
+
+Won. The fix was the **scope recipe**, found by reading a competitor's
+source (`purpleslurple/onenote-mcp-server`): fully-qualified BASE scopes
+(`https://graph.microsoft.com/Notes.Read|Notes.ReadWrite|User.Read`) instead
+of bare `.All` scopes. Combined with the multi-tenant app + browser
+auth-code flow, the OneNote workload accepts the token: notebooks list,
+pages render, search works. Bare `.All` scope tokens were structurally
+rejected (40001) regardless of client, authority, or flow — three combos
+tested, all opaque, all refused.
+
+Follow-up hardening from the same session: MSAL refresh cache
+(`.msal-token-cache.bin`) + silent-refresh-first load order, so hourly
+expiry and backend restarts self-heal with zero clicks.
+
 ## Appendix: environment that works
 - Backend: `ONENOTE_CLIENT_ID=b70aba9c-…` (or unset for default),
   `ONENOTE_AUTHORITY=https://login.microsoftonline.com/common`

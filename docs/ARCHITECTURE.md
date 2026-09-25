@@ -68,11 +68,12 @@ swallowed into "failed").
 
 ## Graph quirks encoded in code
 
-- Section-heavy accounts: collection-wide page queries fail (20266), so
-  search walks each notebook TOC and title-matches; TOC skips slow sections
-  individually with a warning count instead of failing whole.
-- `$search` (full-text) is removed server-side for OneNote; title `$filter`
-  fallback lives in the same path for tenants that still honor `$search`.
+- Section-heavy accounts: collection-wide page queries fail (Graph 20266),
+  so search walks each notebook TOC (sections in parallel, 4-at-a-time) and
+  title-matches client-side; slow sections are skipped individually with a
+  warning count instead of failing the whole load.
+- `$search` (full-text) is removed server-side for OneNote, so title match
+  is the search semantic everywhere (results carry notebook/section).
 - Page bodies come from `.../pages/{id}/content` (metadata endpoint has no
   body); the viewer sanitizes (DOMPurify) and anchors absolute layout
   (`.onenote-content` is `position: relative`).

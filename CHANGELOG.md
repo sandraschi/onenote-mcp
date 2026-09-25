@@ -2,23 +2,50 @@
 
 ## [Unreleased]
 
-### Changed (auth)
-- Scopes switched to fully-qualified base form
-  (`https://graph.microsoft.com/Notes.Read|Notes.ReadWrite|User.Read` +
-  `offline_access`) per the one working third-party recipe — bare `.All`
-  scopes yielded OneNote-rejected tokens for personal accounts.
-- MSAL token cache (`.msal-token-cache.bin`, gitignored): refresh tokens
-  persist, silent re-auth across restarts, no hourly browser round-trip.
+### Added
+- Browser auth-code sign-in (`GET /api/auth/login` + `/api/auth/callback`,
+  Notebooks blue button) - device-flow tokens are rejected by the OneNote
+  workload for personal accounts; the browser flow yields working tokens.
+- `GET /api/auth/debug` (client suffix, authority, scopes, token shape/age,
+  JWT claims - no secrets) + auth events in the activity log + real MSAL
+  error text surfaced in UI.
+- `GET /api/llm/providers|models|onboarding`, `POST /api/llm/chat` proxy;
+  Skills page; `onenote_triage` prompt; Zustand `store/llm.ts`.
+- `docs/ARCHITECTURE.md` (components, auth chain, scope recipe, Graph
+  quirks); `docs/AUTH_INVESTIGATION.md` (401-odyssey record + resolution).
+
+### Changed (auth - the winning recipe)
+- Scopes: fully-qualified base form
+  (`https://graph.microsoft.com/Notes.Read|Notes.ReadWrite|User.Read`) -
+  bare `.All` scopes minted OneNote-rejected tokens for personal accounts.
+- Multi-tenant personal-capable app + `/common` authority (personal-only +
+  `/consumers` also minted rejects); `ONENOTE_CLIENT_ID`/`ONENOTE_AUTHORITY`/
+  `ONENOTE_REDIRECT_URI` env (repo-root `.env` loaded at startup).
+- Silent-refresh-first load order + MSAL cache (`.msal-token-cache.bin`,
+  gitignored): hourly expiry and backend restarts self-heal, no clicks.
+- Sign-in vocabulary unified ("Sign in" everywhere); New-page button
+  disabled + dimmed until signed in.
+
+### Fixed
+- Launcher `UvicornTarget :app` regression (500s) - restored `:http_app`.
+- Cached Graph client surviving re-auth (eternal 401s); MSAL deprecated-API
+  crash in callback ("Invalid parameter type"); reserved-scope 500 in
+  `/api/auth/login` (MSAL injects `offline_access` itself).
+- `get_page` stuffed metadata JSON into content - now fetches `.../content`.
+- Search: TOC-walk title match (collection queries refused with 20266 on
+  section-heavy accounts); results carry notebook/section; UI has notebook
+  filter, sort, 25/page pagination, CSV export.
+- Big-notebook timeouts: parallel section fetch (4-at-a-time), 30s Graph
+  client timeout, partial TOC with warning count, longer UI budgets.
+- Page viewer anchors absolute OneNote layout (was escaping left).
+- New-page dialog takes plain text (paragraphs from blank lines).
+- Status/Tools un-mocked (live endpoints); Tauri `/api` base; Logging
+  double-prefix; Chat via backend proxy; dead Settings buttons wired/removed.
+- Frozen exe `jaraco.text` startup crash (spec hiddenimports + BUILD_LOG).
 
 ### Docs
 - `docs/AUTH_INVESTIGATION.md`: full 2026-09-24 401-odyssey record (evidence,
-  killed theories, request IDs, ranked plan, PnP verdict).
-
-### Fixed
-- OneNote `401` code `40001` after a successful device login: the borrowed
-  Graph Explorer client ID yields opaque tokens the OneNote workload rejects.
-  `ONENOTE_CLIENT_ID` env/`.env` override added (repo-root `.env` is now
-  actually loaded at startup); docs cover the 5-minute app registration.
+  killed theories, request IDs, ranked plan, PnP verdict) + resolution.
 
 ## [1.0.3] - 2026-09-24 (assfix)
 

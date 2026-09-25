@@ -33,7 +33,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `onenote_list_pages` | Pages of a section |
 | `onenote_get_page` | Full HTML content of a page |
 | `onenote_create_page` | Create a page with HTML body |
-| `onenote_search_pages` | Full-text search across notebooks |
+| `onenote_search_pages` | Title-match search across notebooks (with notebook/section context) |
 | `onenote_get_notebook_toc` | Sections + pages overview |
 | `show_notebooks_card` | Notebooks as an in-chat Prefab card |
 | `onenote_help` | Tool list and usage notes |

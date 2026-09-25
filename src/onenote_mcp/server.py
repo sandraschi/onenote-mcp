@@ -1316,7 +1316,7 @@ async def onenote_help() -> str:
 - `onenote_list_pages` - pages of a section
 - `onenote_get_page` - full HTML content of a page
 - `onenote_create_page` - add a page with HTML body
-- `onenote_search_pages` - full-text search across notebooks
+- `onenote_search_pages` - title-match search across notebooks
 - `onenote_get_notebook_toc` - sections + pages overview
 - `show_notebooks_card` - notebooks as an in-chat Prefab card
 - `shutdown_server` - stop the server"""

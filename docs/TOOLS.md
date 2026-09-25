@@ -12,7 +12,7 @@
 | `onenote_list_pages` | Pages of a section. |
 | `onenote_get_page` | Full HTML content of a page. |
 | `onenote_create_page` | Create a page (HTML body) in a notebook. |
-| `onenote_search_pages` | Full-text search across notebooks. |
+| `onenote_search_pages` | Title-match search across notebooks (TOC walk; carries notebook/section). |
 | `onenote_get_notebook_toc` | Notebook table of contents (sections + pages). |
 | `onenote_help` | One-line usage for every tool. |
 | `shutdown_server` | Graceful server termination. |

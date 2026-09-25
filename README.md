@@ -108,12 +108,12 @@ The first time you ask about OneNote, the AI will guide you through the authenti
 
 - Authentication with Microsoft OneNote (browser sign-in primary, device-code fallback; no Azure subscription needed - free app registration)
 - List all notebooks, sections, and pages
-- Create new pages with HTML content
+- Create new pages (plain text in the webapp, HTML via the MCP tool)
 - Read complete page content, including HTML formatting
 - Extract text content for AI analysis and summaries
 - Summarize content of all pages in a single operation
 - Read full content of all pages in a readable format
-- Search across your notes
+- Search page titles across your notes (with notebook filter, sort, pagination, CSV export)
 
 ##  Installation
 
@@ -199,7 +199,7 @@ Once authenticated, the following tools are available for AI assistants to use:
 | `onenote_list_pages` | List all pages in a section |
 | `onenote_get_page` | Get the complete content of a specific page, including HTML formatting |
 | `onenote_create_page` | Create a new page with HTML content |
-| `onenote_search_pages` | Search for pages across your notebooks |
+| `onenote_search_pages` | Title-match search for pages across your notebooks |
 | `onenote_get_notebook_toc` | Generate a Table of Contents for a notebook (all sections & pages) |
 
 ## Example Interactions
