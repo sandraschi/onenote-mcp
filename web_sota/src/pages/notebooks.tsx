@@ -97,6 +97,9 @@ export function Notebooks() {
 
   const startAuth = async () => {
     setError("");
+    // Open the tab synchronously in the click gesture: window.open after an
+    // await is outside the gesture and popup blockers kill it silently.
+    const tab = window.open("about:blank", "_blank", "noopener");
     try {
       // Browser redirect login (auth-code flow): device-code tokens are
       // rejected by the OneNote workload for personal accounts.
@@ -106,11 +109,23 @@ export function Notebooks() {
         error?: string;
       }>("/auth/login");
       if (!data.success || !data.auth_uri) {
+        try {
+          tab?.close();
+        } catch {
+          /* already closed */
+        }
         setError(data.error || "Sign-in start failed");
         return;
       }
       setAuthFlow({ auth_uri: data.auth_uri });
-      window.open(data.auth_uri, "_blank", "noopener");
+      if (tab) {
+        tab.location.href = data.auth_uri;
+      } else {
+        // Popup blocked entirely: continue in this tab. After approval,
+        // return here manually - the page loads signed in.
+        window.location.href = data.auth_uri;
+        return;
+      }
       let attempts = 0;
       authTimerRef.current = setInterval(async () => {
         attempts += 1;
