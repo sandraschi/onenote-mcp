@@ -43,7 +43,8 @@ All tools are read-only except `onenote_create_page` (MUTATING),
 | `GET /api/notebooks/{id}/toc` | Notebook table of contents. |
 | `GET /api/pages/{id}` | Page content. |
 | `POST /api/pages` | Create page (`notebook_id`, `title`, `content`). |
-| `GET /api/search?q=` | Search pages. |
+| `GET /api/search?q=` | Search pages (`mode=title` default, `mode=fulltext` over the local index). |
+| `POST /api/index`, `GET /api/index/status` | Build + monitor the FTS5 full-text index. |
 
 ## MCP transport
 
