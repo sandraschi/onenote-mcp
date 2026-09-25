@@ -41,6 +41,8 @@ TOKEN_FILE_PATH = PROJECT_ROOT / TOKEN_FILE_NAME
 # Global state
 _access_token: str | None = None
 _graph_client: httpx.AsyncClient | None = None
+_TOKEN_SET_AT: float = 0.0
+_TOKEN_TTL_SECONDS = 3000.0  # refresh proactively after ~50 min (Graph gives ~60)
 
 # MSAL token cache (access + refresh tokens). Lets the backend silently
 # re-authenticate across restarts without another browser round-trip.
@@ -78,9 +80,12 @@ def try_silent_auth() -> str | None:
             _save_cache()
             save_access_token(result["access_token"])
             logger.info("Silent auth succeeded")
+            _log.info("auth", "silent refresh succeeded")
             return result["access_token"]
+        _log.warn("auth", f"silent refresh empty: {(result or {}).get('error_description', 'no token')}")
     except Exception as exc:
         logger.warning("Silent auth failed: %s", exc)
+        _log.warn("auth", f"silent refresh failed: {exc}")
     return None
 
 
@@ -92,8 +97,12 @@ def load_access_token() -> str | None:
     restart + one hour means a dead session and a 401 wall.
     """
     global _access_token
-    if _access_token:
+    if _access_token and (time.time() - _TOKEN_SET_AT) < _TOKEN_TTL_SECONDS:
         return _access_token
+    if _access_token:
+        # Hourly expiry: memory token is stale, refresh before using it.
+        _access_token = None
+        _graph_client = None
 
     # Refresh cache first (no network when the cached token is still valid)
     try:
@@ -128,8 +137,9 @@ def load_access_token() -> str | None:
 
 def save_access_token(token: str) -> None:
     """Save access token to file."""
-    global _access_token, _graph_client
+    global _access_token, _graph_client, _TOKEN_SET_AT
     _access_token = token
+    _TOKEN_SET_AT = time.time()
     # Drop the cached Graph client: it was built with the previous token's
     # Authorization header and would otherwise keep 401ing after re-auth.
     _graph_client = None
