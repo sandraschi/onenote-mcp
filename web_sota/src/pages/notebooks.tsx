@@ -308,6 +308,14 @@ export function Notebooks() {
     setCreating(true);
     setNotice("");
     try {
+      // Plain text in, semantic HTML out: blank lines = paragraphs.
+      const html = newContent
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .split(/\n{2,}/)
+        .map((para) => `<p>${para.replace(/\n/g, "<br/>")}</p>`)
+        .join("");
       const data = await fetchJson<{
         success: boolean;
         error?: string;
@@ -316,7 +324,7 @@ export function Notebooks() {
         body: JSON.stringify({
           notebook_id: selectedNotebook,
           title: newTitle.trim(),
-          content: newContent,
+          content: html,
         }),
       });
       if (!data.success) throw new Error(data.error || "Create failed");
@@ -730,14 +738,16 @@ export function Notebooks() {
             </div>
             <div className="space-y-2">
               <label className="block text-sm text-slate-300">
-                Content (HTML)
+                Content (plain text)
               </label>
               <textarea
                 data-testid="create-content"
                 className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 h-32 resize-none"
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
-                placeholder="<p>Write something...</p>"
+                placeholder={
+                  "First paragraph.\n\nSecond paragraph after a blank line."
+                }
               />
             </div>
             <div className="flex justify-end gap-2">
