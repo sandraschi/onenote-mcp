@@ -1,6 +1,6 @@
 [project]
 name = "onenote-mcp"
-version = "1.0.3"
+version = "1.0.4"
 description = "FastMCP 3.1.0+ server for Microsoft OneNote integration"
 readme = "README.md"
 license = { text = "MIT" }
@@ -80,7 +80,7 @@ testpaths = ["tests"]
 [tool.mcpb]
 name = "onenote-mcp"
 description = "FastMCP server for Microsoft OneNote integration"
-version = "1.0.3"
+version = "1.0.4"
 
 [tool.mcpb.server]
 command = "python"

@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "onenote-mcp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "FastMCP 3.4+ server for Microsoft OneNote integration",
   "author": { "name": "sandraschi" },
   "server": {
