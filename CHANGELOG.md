@@ -10,6 +10,9 @@
   ghaudit stale, thin coverage, no shortcuts.
 
 ### Added
+- Append-to-note: `onenote_append_page` tool + `PATCH /api/pages/{id}/append`
+  (plain text in, Graph PATCH commands) + viewer append box with reload.
+  16 tools total.
 - Local full-text search: SQLite FTS5 index over page bodies
   (`src/onenote_mcp/search_index.py`, incremental, stopword-safe quoting),
   `onenote_index_start|status` tools, `POST /api/index` +
