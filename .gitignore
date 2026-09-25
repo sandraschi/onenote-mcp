@@ -32,6 +32,7 @@ reports/
 .env.test.local
 .env.production.local
 .access-token.txt
+.msal-token-cache.bin
 
 # Logs
 logs

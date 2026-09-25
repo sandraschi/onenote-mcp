@@ -41,6 +41,47 @@ TOKEN_FILE_PATH = PROJECT_ROOT / TOKEN_FILE_NAME
 _access_token: str | None = None
 _graph_client: httpx.AsyncClient | None = None
 
+# MSAL token cache (access + refresh tokens). Lets the backend silently
+# re-authenticate across restarts without another browser round-trip.
+_CACHE_PATH = PROJECT_ROOT / ".msal-token-cache.bin"
+_token_cache = msal.SerializableTokenCache()
+try:
+    if _CACHE_PATH.exists():
+        _token_cache.deserialize(_CACHE_PATH.read_bytes().decode("utf-8"))
+except Exception as exc:
+    logger.warning("Ignoring corrupt MSAL cache: %s", exc)
+
+
+def _save_cache() -> None:
+    if _token_cache.has_state_changed:
+        try:
+            _CACHE_PATH.write_bytes(_token_cache.serialize().encode("utf-8"))
+        except Exception as exc:
+            logger.warning("Could not persist MSAL cache: %s", exc)
+
+
+def _msal_app() -> msal.PublicClientApplication:
+    return msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY, token_cache=_token_cache)
+
+
+def try_silent_auth() -> str | None:
+    """Use cached refresh token to get an access token without user action."""
+    global _access_token
+    try:
+        app = _msal_app()
+        accounts = app.get_accounts()
+        if not accounts:
+            return None
+        result = app.acquire_token_silent(SCOPES, account=accounts[0])
+        if result and "access_token" in result:
+            _save_cache()
+            save_access_token(result["access_token"])
+            logger.info("Silent auth succeeded")
+            return result["access_token"]
+    except Exception as exc:
+        logger.warning("Silent auth failed: %s", exc)
+    return None
+
 
 def load_access_token() -> str | None:
     """Load access token from file or environment variable."""
@@ -68,7 +109,8 @@ def load_access_token() -> str | None:
         _access_token = env_token.strip()
         return _access_token
 
-    return None
+    # Last resort: cached refresh token (survives restarts, no browser needed)
+    return try_silent_auth()
 
 
 def save_access_token(token: str) -> None:
@@ -102,7 +144,7 @@ async def get_graph_client() -> httpx.AsyncClient:
 
 async def authenticate_device_code() -> dict[str, Any]:
     """Start device code authentication flow."""
-    app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
+    app = _msal_app()
 
     # Get device code
     flow = app.initiate_device_flow(scopes=SCOPES)
@@ -115,6 +157,7 @@ async def authenticate_device_code() -> dict[str, Any]:
     result = app.acquire_token_by_device_flow(flow)
 
     if "access_token" in result:
+        _save_cache()
         save_access_token(result["access_token"])
         return {"success": True, "message": "Authentication successful"}
     else:
@@ -634,9 +677,7 @@ _auth_flows: dict[str, dict[str, Any]] = {}
 
 
 def _start_auth_flow() -> dict[str, Any]:
-    import msal
-
-    app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
+    app = _msal_app()
     flow = app.initiate_device_flow(scopes=SCOPES)
     if "user_code" not in flow:
         raise ValueError(f"Failed to create device flow: {flow.get('error_description', flow.get('error', 'unknown'))}")
@@ -647,6 +688,7 @@ def _start_auth_flow() -> dict[str, Any]:
     def _wait():
         result = app.acquire_token_by_device_flow(flow)
         if "access_token" in result:
+            _save_cache()
             save_access_token(result["access_token"])
             account = result.get("id_token_claims", {}).get("preferred_username", "")
             _log.info("auth", f"device flow authorized ({account})")
@@ -720,7 +762,7 @@ async def api_auth_login(request: Request) -> JSONResponse:
     now = time.time()
     for state in [s for s, e in _auth_code_flows.items() if now - e["started"] > 600]:
         _auth_code_flows.pop(state, None)
-    app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
+    app = _msal_app()
     flow = app.initiate_auth_code_flow(SCOPES, redirect_uri=REDIRECT_URI)
     if "auth_uri" not in flow:
         err = flow.get("error_description", flow.get("error", "unknown"))
@@ -758,7 +800,7 @@ async def api_auth_callback(request: Request) -> "HTMLResponse":
             "callback with unknown/expired state - backend likely restarted after login started",
         )
         return _auth_page("Login expired", "No matching login session - start sign-in again.", ok=False)
-    app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
+    app = _msal_app()
     try:
         # Modern MSAL API: flow first, response second. (The legacy
         # acquire_token_by_authorization_code(code, scopes) takes a scope
@@ -771,6 +813,7 @@ async def api_auth_callback(request: Request) -> "HTMLResponse":
         _log.error("auth", f"code exchange crashed: {exc}\n{_tb.format_exc()[-1500:]}")
         return _auth_page("Sign-in failed", f"Code exchange crashed: {exc}", ok=False)
     if "access_token" in result:
+        _save_cache()
         save_access_token(result["access_token"])
         account = result.get("id_token_claims", {}).get("preferred_username", "")
         _log.info("auth", f"browser login authorized ({account})")
@@ -805,6 +848,7 @@ async def api_auth_debug(request: Request) -> JSONResponse:
         "token_present": bool(token),
         "token_format": None,
         "token_age_seconds": None,
+        "token_cache_present": _CACHE_PATH.exists(),
         "graph_client_cached": _graph_client is not None,
     }
     if token:

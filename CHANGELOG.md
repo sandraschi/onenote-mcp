@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed (auth)
+- Scopes switched to fully-qualified base form
+  (`https://graph.microsoft.com/Notes.Read|Notes.ReadWrite|User.Read` +
+  `offline_access`) per the one working third-party recipe — bare `.All`
+  scopes yielded OneNote-rejected tokens for personal accounts.
+- MSAL token cache (`.msal-token-cache.bin`, gitignored): refresh tokens
+  persist, silent re-auth across restarts, no hourly browser round-trip.
+
 ### Docs
 - `docs/AUTH_INVESTIGATION.md`: full 2026-09-24 401-odyssey record (evidence,
   killed theories, request IDs, ranked plan, PnP verdict).

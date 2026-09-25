@@ -19,7 +19,15 @@ except Exception as exc:
 # OneNote access register your own app (see docs/ONBOARDING.md) and set
 # ONENOTE_CLIENT_ID in the environment or repo-root .env.
 CLIENT_ID = os.environ.get("ONENOTE_CLIENT_ID", "14d82eec-204b-4c2f-b7e8-296a70dab67e")
-SCOPES = ["Notes.Read.All", "Notes.ReadWrite.All", "User.Read"]
+# Fully-qualified base scopes (purpleslurple recipe): the OneNote workload
+# honors these for personal accounts where bare `.All` scopes yield rejected
+# tokens. `offline_access` gives a refresh token for silent re-auth.
+SCOPES = [
+    "https://graph.microsoft.com/Notes.Read",
+    "https://graph.microsoft.com/Notes.ReadWrite",
+    "https://graph.microsoft.com/User.Read",
+    "offline_access",
+]
 
 # Entra authority. Apps registered for "Personal Microsoft accounts only"
 # MUST use the /consumers endpoint (/common is rejected with AADSTS9002346).
