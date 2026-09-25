@@ -267,30 +267,29 @@ async def create_page(notebook_id: str, title: str, content: str) -> dict[str, A
 
 
 async def search_pages(query: str) -> list[Page]:
-    """Search for pages across all notebooks.
+    """Search for pages across all notebooks (title match).
 
-    Microsoft removed full-text OneNote $search; title-contains $filter is
-    what remains. Tries $search first (works on some tenants), falls back
-    to title $filter on 400.
+    Collection-wide page queries ($search and cross-notebook $filter) are
+    refused for accounts with many sections (Graph 20266), so walk each
+    notebook's TOC (section-scoped page lists) and match titles client-side.
     """
-    from urllib.parse import quote as _quote
-
-    client = await get_graph_client()
-    try:
-        response = await client.get(f"/me/onenote/pages?search={_quote(query)}")
-        response.raise_for_status()
-    except Exception:
-        safe = query.replace("'", "''")
-        response = await client.get(f"/me/onenote/pages?$filter=contains(title,'{_quote(safe, safe='')}')")
-        response.raise_for_status()
-
-    data = response.json()
-    pages = []
-    for page_data in data.get("value", []):
-        title = page_data.get("title", f"Page {page_data['id'][:8]}")
-        pages.append(Page(**{**page_data, "title": title}))
-
-    return pages
+    needle = query.strip().lower()
+    notebooks = await list_notebooks()
+    hits: list[Page] = []
+    for nb in notebooks:
+        try:
+            toc = await get_notebook_toc(nb.id)
+        except Exception as exc:
+            logger.warning("TOC walk skipped notebook %s: %s", nb.id, exc)
+            continue
+        for section in toc.sections:
+            for toc_page in section.pages:
+                if needle in (toc_page.title or "").lower():
+                    try:
+                        hits.append(await get_page(toc_page.id))
+                    except Exception as exc:
+                        logger.warning("Search skipped page %s: %s", toc_page.id, exc)
+    return hits
 
 
 async def get_notebook_toc(notebook_id: str) -> TOCData:
