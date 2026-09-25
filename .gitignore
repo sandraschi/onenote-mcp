@@ -18,6 +18,13 @@ native/target/
 native/gen/
 mcpb/src/
 
+# Local data (search index, caches - regenerable, never commit)
+data/
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+
 # Backups (batch-edit safety)
 *.bak
 *.bak.*
@@ -67,6 +74,9 @@ Thumbs.db
 .npm
 .eslintcache
 .cache
+.coverage
+.coverage.*
+htmlcov/
 .parcel-cache
 .rpt2_cache/
 .rts2_cache_cjs/

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Assfix 2026-09-25 (66 -> ~85, SOTA)
+- `data/` + `*.sqlite3` + `.coverage` gitignored (index DB must never commit).
+- Session-context tool counts 13 -> 15 (second drift in 2 days).
+- README mirror re-synced (mcp-central-docs project page).
+- Deferred (documented): Inbox page, output_schema, dialogic retype;
+  ghaudit stale, thin coverage, no shortcuts.
+
 ### Added
 - Local full-text search: SQLite FTS5 index over page bodies
   (`src/onenote_mcp/search_index.py`, incremental, stopword-safe quoting),
