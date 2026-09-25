@@ -293,33 +293,36 @@ async def search_pages(query: str) -> list[Page]:
 
 
 async def get_notebook_toc(notebook_id: str) -> TOCData:
-    """Generate table of contents for a notebook."""
+    """Generate table of contents for a notebook (sections fetched in parallel)."""
     notebook = await get_notebook(notebook_id)
     sections = await list_sections(notebook_id)
 
-    toc_sections = []
-    total_pages = 0
+    semaphore = asyncio.Semaphore(6)
 
-    for section in sections:
-        pages = await list_pages(section.id)
-        total_pages += len(pages)
+    async def _section_pages(section: Section) -> TOCSection:
+        async with semaphore:
+            pages = await list_pages(section.id)
+        return TOCSection(
+            name=section.displayName,
+            pageCount=len(pages),
+            pages=[
+                TOCPage(
+                    title=page.title,
+                    id=page.id,
+                    created=page.createdDateTime,
+                    modified=page.lastModifiedDateTime,
+                )
+                for page in pages
+            ],
+        )
 
-        toc_pages = [
-            TOCPage(
-                title=page.title,
-                id=page.id,
-                created=page.createdDateTime,
-                modified=page.lastModifiedDateTime,
-            )
-            for page in pages
-        ]
-
-        toc_sections.append(TOCSection(name=section.displayName, pageCount=len(pages), pages=toc_pages))
+    toc_sections = await asyncio.gather(*(_section_pages(s) for s in sections))
+    total_pages = sum(s.pageCount for s in toc_sections)
 
     return TOCData(
         notebook=notebook.displayName,
         stats={"sections": len(sections), "pages": total_pages},
-        sections=toc_sections,
+        sections=list(toc_sections),
     )
 
 

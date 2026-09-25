@@ -195,7 +195,11 @@ export function Notebooks() {
         success: boolean;
         toc?: TocData;
         error?: string;
-      }>(`/notebooks/${encodeURIComponent(notebookId)}/toc`);
+      }>(
+        `/notebooks/${encodeURIComponent(notebookId)}/toc`,
+        undefined,
+        120_000,
+      );
       if (!data.success) throw new Error(data.error || "Failed to load TOC");
       setToc(data.toc || null);
     } catch (e) {
@@ -236,7 +240,7 @@ export function Notebooks() {
         success: boolean;
         pages?: SearchResult[];
         error?: string;
-      }>(`/search?q=${encodeURIComponent(query.trim())}`);
+      }>(`/search?q=${encodeURIComponent(query.trim())}`, undefined, 180_000);
       if (!data.success) throw new Error(data.error || "Search failed");
       setSearchResults(data.pages || []);
     } catch (e) {
