@@ -41,6 +41,7 @@ type SearchResult = {
   lastModifiedDateTime: string;
   notebook?: string;
   section?: string;
+  snippet?: string;
 };
 
 function fmtDate(iso?: string): string {
@@ -72,6 +73,13 @@ export function Notebooks() {
   >("modified");
   const [searchNotebook, setSearchNotebook] = useState("");
   const [searchPage, setSearchPage] = useState(0);
+  const [searchMode, setSearchMode] = useState<"title" | "fulltext">("title");
+  const [indexStatus, setIndexStatus] = useState<{
+    state: string;
+    total: number;
+    done: number;
+    indexed_pages: number;
+  } | null>(null);
   const SEARCH_PAGE_SIZE = 25;
 
   const getVisibleResults = () => {
@@ -142,6 +150,7 @@ export function Notebooks() {
 
   useEffect(() => {
     loadAuthStatus();
+    refreshIndexStatus();
   }, [loadAuthStatus]);
 
   const startAuth = async () => {
@@ -292,14 +301,62 @@ export function Notebooks() {
       const data = await fetchJson<{
         success: boolean;
         pages?: SearchResult[];
+        warning?: string;
         error?: string;
-      }>(`/search?q=${encodeURIComponent(query.trim())}`, undefined, 180_000);
+      }>(
+        `/search?q=${encodeURIComponent(query.trim())}&mode=${searchMode}`,
+        undefined,
+        180_000,
+      );
       if (!data.success) throw new Error(data.error || "Search failed");
       setSearchResults(data.pages || []);
+      if (data.warning) setNotice(data.warning);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSearching(false);
+    }
+  };
+
+  const refreshIndexStatus = async () => {
+    try {
+      const data = await fetchJson<{
+        success: boolean;
+        state: string;
+        total: number;
+        done: number;
+        indexed_pages: number;
+      }>("/index/status");
+      if (data.success) {
+        setIndexStatus({
+          state: data.state,
+          total: data.total,
+          done: data.done,
+          indexed_pages: data.indexed_pages,
+        });
+        return data.state;
+      }
+    } catch {
+      /* backend unreachable */
+    }
+    return "";
+  };
+
+  const startIndexBuild = async () => {
+    setError("");
+    try {
+      const data = await fetchJson<{ success: boolean; error?: string }>(
+        "/index",
+        { method: "POST" },
+      );
+      if (!data.success) throw new Error(data.error || "Index start failed");
+      await refreshIndexStatus();
+      const timer = setInterval(async () => {
+        const state = await refreshIndexStatus();
+        if (state !== "running") clearInterval(timer);
+      }, 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -375,6 +432,19 @@ export function Notebooks() {
               onKeyDown={(e) => e.key === "Enter" && runSearch()}
             />
           </div>
+          <select
+            data-testid="search-mode"
+            aria-label="Search mode"
+            title="Title matches page titles; Full text searches note bodies (needs the index)"
+            className="h-[34px] rounded-md border border-slate-700 bg-slate-900 px-2 text-sm text-slate-300"
+            value={searchMode}
+            onChange={(e) =>
+              setSearchMode(e.target.value as "title" | "fulltext")
+            }
+          >
+            <option value="title">Title</option>
+            <option value="fulltext">Full text</option>
+          </select>
           <button
             type="button"
             data-testid="notebook-create"
@@ -504,6 +574,30 @@ export function Notebooks() {
             >
               Export
             </button>
+            {searchMode === "fulltext" && (
+              <>
+                <button
+                  type="button"
+                  data-testid="index-build"
+                  title="Walk all notebooks and index page bodies for full-text search"
+                  className="h-8 rounded border border-slate-700 px-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled={indexStatus?.state === "running"}
+                  onClick={startIndexBuild}
+                >
+                  {indexStatus?.state === "running"
+                    ? `Indexing ${indexStatus.done}/${indexStatus.total}…`
+                    : "Build index"}
+                </button>
+                {indexStatus && indexStatus.state !== "running" && (
+                  <span
+                    data-testid="index-status"
+                    className="text-sm text-slate-400"
+                  >
+                    {indexStatus.indexed_pages} pages indexed
+                  </span>
+                )}
+              </>
+            )}
             <button
               type="button"
               className="text-slate-400 hover:text-slate-200"
@@ -534,22 +628,29 @@ export function Notebooks() {
                         className="w-full text-left px-4 py-2.5 hover:bg-slate-900/40 flex items-center justify-between gap-3"
                         onClick={() => openPage(p.id)}
                       >
-                        <span className="text-sm text-slate-200 truncate">
-                          <FileText className="h-3.5 w-3.5 inline mr-1.5 text-blue-400" />
-                          {p.title || "(untitled)"}
-                          {p.notebook && (
-                            <span className="text-slate-400">
-                              {" "}
-                              · {p.notebook}
+                        <div className="flex-1 min-w-0">
+                          <span className="block text-sm text-slate-200 truncate">
+                            <FileText className="h-3.5 w-3.5 inline mr-1.5 text-blue-400" />
+                            {p.title || "(untitled)"}
+                            {p.notebook && (
+                              <span className="text-slate-400">
+                                {" "}
+                                · {p.notebook}
+                              </span>
+                            )}
+                            {p.section && (
+                              <span className="text-slate-500">
+                                {" "}
+                                / {p.section}
+                              </span>
+                            )}
+                          </span>
+                          {p.snippet && (
+                            <span className="block text-sm text-slate-400 truncate">
+                              …{p.snippet}…
                             </span>
                           )}
-                          {p.section && (
-                            <span className="text-slate-500">
-                              {" "}
-                              / {p.section}
-                            </span>
-                          )}
-                        </span>
+                        </div>
                         <span className="text-xs text-slate-400 shrink-0">
                           {fmtDate(p.lastModifiedDateTime)}
                         </span>
