@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- Local full-text search: SQLite FTS5 index over page bodies
+  (`src/onenote_mcp/search_index.py`, incremental, stopword-safe quoting),
+  `onenote_index_start|status` tools, `POST /api/index` +
+  `GET /api/index/status`, `mode=fulltext` on search (tool + REST + UI with
+  snippet rows, index button + progress). 15 tools total.
 - Browser auth-code sign-in (`GET /api/auth/login` + `/api/auth/callback`,
   Notebooks blue button) - device-flow tokens are rejected by the OneNote
   workload for personal accounts; the browser flow yields working tokens.

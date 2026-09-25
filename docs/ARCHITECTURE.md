@@ -69,9 +69,12 @@ swallowed into "failed").
 ## Graph quirks encoded in code
 
 - Section-heavy accounts: collection-wide page queries fail (Graph 20266),
-  so search walks each notebook TOC (sections in parallel, 4-at-a-time) and
-  title-matches client-side; slow sections are skipped individually with a
-  warning count instead of failing the whole load.
+  so title search walks each notebook TOC (sections in parallel, 4-at-a-time)
+  and title-matches client-side; slow sections are skipped individually with a
+  warning count instead of failing the whole load. Full-text body search runs
+  on a local SQLite FTS5 index (`src/onenote_mcp/search_index.py`, DB in
+  gitignored `data/`, incremental by modified stamp, built via
+  `POST /api/index` / `onenote_index_start`).
 - `$search` (full-text) is removed server-side for OneNote, so title match
   is the search semantic everywhere (results carry notebook/section).
 - Page bodies come from `.../pages/{id}/content` (metadata endpoint has no

@@ -21,7 +21,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `ONENOTE_LOG_LEVEL` | info | uvicorn log level |
 | `MCP_BRIDGE_URLS` | - | Comma-separated remote MCP URLs proxied via create_proxy |
 
-## MCP tools (13) + prompts (1)
+## MCP tools (15) + prompts (1)
 
 | Tool | Purpose |
 |------|---------|
@@ -33,7 +33,9 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `onenote_list_pages` | Pages of a section |
 | `onenote_get_page` | Full HTML content of a page |
 | `onenote_create_page` | Create a page with HTML body |
-| `onenote_search_pages` | Title-match search across notebooks (with notebook/section context) |
+| `onenote_search_pages` | Title-match search across notebooks (with notebook/section context); `mode="fulltext"` over the local FTS index |
+| `onenote_index_start` | Build/refresh the local full-text index (background) |
+| `onenote_index_status` | Index build progress and searchable page count |
 | `onenote_get_notebook_toc` | Sections + pages overview |
 | `show_notebooks_card` | Notebooks as an in-chat Prefab card |
 | `onenote_help` | Tool list and usage notes |
@@ -52,7 +54,8 @@ Prompt: `onenote_triage` - guided DISCOVER/RETRIEVE/MAP/CAPTURE triage.
 - `GET /api/auth/login`, `GET /api/auth/callback` — browser auth-code sign-in (primary)
 - `GET /api/auth/debug` — auth diagnostics (no secrets)
 - `GET /api/notebooks`, `GET /api/notebooks/{id}/toc` — notebook browser
-- `GET /api/pages/{id}`, `POST /api/pages`, `GET /api/search?q=` — page content/creation/search
+- `GET /api/pages/{id}`, `POST /api/pages`, `GET /api/search?q=&mode=` — page content/creation/search (title or fulltext)
+- `POST /api/index`, `GET /api/index/status` — FTS index build + progress
 - `GET /api/skills`, `GET /api/skills/{name}` — skills list + SKILL.md content
 - `GET /api/fleet/apps` — Apps Hub registry (adjacent fleet webapps)
 - `GET /api/llm/discover` — local LLM probe (Ollama :11434, LM Studio :1234, vLLM :8000; `providers[].models`)
