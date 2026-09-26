@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.4] - 2026-09-26
 
 ### Added
 - Markdown backup: `onenote_export|export_status` tools + `POST /api/export`
@@ -12,9 +12,10 @@
   "Ask about this page" deep-links to `/chat?with=` with a removable chip.
 - Recent changes feed: `onenote_recent` tool + `GET /api/recent` (TOC walk,
   newest first, 7/30-day window) + Recent page in sidebar (the domain inbox).
-  17 tools total.
-
-## [1.0.4] - 2026-09-25
+- ASGI access log into the activity ring (method/path/status/duration;
+  health/log noise excluded) + audit lines for page create/append.
+- Status KPIs: live notebook count + search-index state; standard sidebar
+  (top collapse toggle, backend dot, unique icons); dashboard hero text.
 
 ### Assfix 2026-09-25 (66 -> ~85, SOTA)
 - `data/` + `*.sqlite3` + `.coverage` gitignored (index DB must never commit).
@@ -56,6 +57,8 @@
   `ONENOTE_REDIRECT_URI` env (repo-root `.env` loaded at startup).
 - Silent-refresh-first load order + MSAL cache (`.msal-token-cache.bin`,
   gitignored): hourly expiry and backend restarts self-heal, no clicks.
+  Tokens older than ~50 min proactively refresh (memory short-circuit was
+  serving expired tokens forever).
 - Sign-in vocabulary unified ("Sign in" everywhere); New-page button
   disabled + dimmed until signed in.
 
