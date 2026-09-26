@@ -9,6 +9,7 @@ import {
   Send,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { API_BASE } from "@/lib/api";
@@ -265,6 +266,28 @@ export function Chat() {
     refresh: refreshLlm,
   } = useLlmStore();
   const [loading, setLoading] = useState(false);
+  const [params] = useSearchParams();
+  const [groundedId, setGroundedId] = useState<string | null>(null);
+  const [groundedTitle, setGroundedTitle] = useState("");
+
+  // Deep link from Notebooks (?with=<pageId>): ground answers in that page.
+  useEffect(() => {
+    const pid = params.get("with");
+    if (!pid) return;
+    setGroundedId(pid);
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/pages/${encodeURIComponent(pid)}`);
+        if (!r.ok) return;
+        const d = (await r.json()) as {
+          page?: { title?: string };
+        };
+        if (d.page?.title) setGroundedTitle(d.page.title);
+      } catch {
+        /* title optional; id still grounds */
+      }
+    })();
+  }, [params]);
   const [personalityId, setPersonalityId] = useState(loadPersonality);
   const [customPrompt] = useState("");
   const [skillContent, setSkillContent] = useState("");
@@ -363,6 +386,7 @@ export function Chat() {
             provider,
             model,
             messages: [{ role: "system", content: systemPrompt }, ...next],
+            context_ids: groundedId ? [groundedId] : [],
           }),
         });
         const data = (await r.json()) as {
@@ -393,7 +417,7 @@ export function Chat() {
         setLoading(false);
       }
     },
-    [input, loading, messages, model, provider, systemPrompt],
+    [input, loading, messages, model, provider, systemPrompt, groundedId],
   );
 
   const regenerate = useCallback(() => {
@@ -478,7 +502,26 @@ export function Chat() {
         className="flex items-center justify-between gap-2 text-sm flex-wrap"
         data-testid="chat-controls"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {groundedId && (
+            <span
+              data-testid="chat-context"
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-800 bg-emerald-950/40 px-2.5 py-1 text-emerald-300"
+            >
+              Using: {groundedTitle || "note"}
+              <button
+                type="button"
+                aria-label="Remove note context"
+                className="hover:text-white"
+                onClick={() => {
+                  setGroundedId(null);
+                  setGroundedTitle("");
+                }}
+              >
+                ×
+              </button>
+            </span>
+          )}
           {llmUp === null ? (
             <span className="text-muted-foreground">Detecting...</span>
           ) : llmUp ? (

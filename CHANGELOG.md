@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Grounded chat: `POST /api/llm/chat` accepts `context_ids` (up to 3 pages,
+  stripped + truncated, injected as ground-truth system context); viewer
+  "Ask about this page" deep-links to `/chat?with=` with a removable chip.
 - Recent changes feed: `onenote_recent` tool + `GET /api/recent` (TOC walk,
   newest first, 7/30-day window) + Recent page in sidebar (the domain inbox).
   17 tools total.

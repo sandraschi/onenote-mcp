@@ -520,7 +520,17 @@ export function Notebooks() {
                   onChange={(e) => setAppendText(e.target.value)}
                   placeholder="Type to append to this note (plain text, blank lines = paragraphs)..."
                 />
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    data-testid="page-ask-btn"
+                    className="text-sm px-3 py-1.5 rounded border border-slate-700 text-slate-300 hover:bg-slate-800"
+                    onClick={() =>
+                      selectedPage && navigate(`/chat?with=${selectedPage.id}`)
+                    }
+                  >
+                    Ask about this page
+                  </button>
                   <button
                     type="button"
                     data-testid="page-append-btn"

@@ -679,6 +679,7 @@ async def api_llm_chat(request: Request) -> JSONResponse:
     provider = str(body.get("provider") or "ollama")
     model = str(body.get("model") or "")
     messages = body.get("messages") or []
+    context_ids = body.get("context_ids") or []
     if provider not in _LLM_PROVIDERS:
         return JSONResponse({"success": False, "error": f"unknown provider '{provider}'"}, status_code=404)
     if not model or not isinstance(messages, list) or not messages:
@@ -688,6 +689,26 @@ async def api_llm_chat(request: Request) -> JSONResponse:
         )
     kind = _LLM_PROVIDERS[provider]["kind"]
     port = _LLM_PROVIDERS[provider]["port"]
+    if isinstance(context_ids, list) and context_ids:
+        # Ground the answer in up to 3 note bodies (plain text, truncated).
+        chunks: list[str] = []
+        for pid in context_ids[:3]:
+            try:
+                page = await get_page(str(pid))
+                text = search_index.strip_html(page.content or "")[:2500]
+                if text.strip():
+                    chunks.append(f"### {page.title}\n{text.strip()}")
+            except Exception as exc:
+                logger.warning("Chat context skipped page %s: %s", pid, exc)
+        if chunks:
+            context_msg = {
+                "role": "system",
+                "content": (
+                    "Use these OneNote pages as ground truth when relevant. "
+                    "If they don't answer the question, say so instead of inventing.\n\n" + "\n\n".join(chunks)
+                ),
+            }
+            messages = [context_msg, *messages]
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             if kind == "ollama":
