@@ -114,8 +114,11 @@ export function Dashboard() {
           <h2 className="text-2xl font-bold tracking-tight text-white">
             OneNote MCP Dashboard
           </h2>
-          <p className="text-slate-300">
-            Backend status, tool surface, and activity overview
+          <p className="text-slate-300 max-w-2xl" data-testid="dashboard-hero">
+            Your OneNote notebooks, readable by you and your AI assistant.
+            Browse and search notes under Notebooks, chat about them under AI
+            Command — agents get the same power through 16 MCP tools. Sign in
+            once with Microsoft; the session renews itself.
           </p>
         </div>
         <div className="flex items-center gap-2">
