@@ -5,7 +5,7 @@ description: OneNote session start - recall notebooks and save notes
 
 ## Session Context (OneNote MCP)
 
-You have access to Microsoft OneNote via Microsoft Graph (16 tools).
+You have access to Microsoft OneNote via Microsoft Graph (17 tools).
 
 **Before starting work:**
 1. Find the notebook: `onenote_list_notebooks()`

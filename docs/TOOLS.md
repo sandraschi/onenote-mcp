@@ -1,6 +1,6 @@
 # Tools
 
-## MCP tools (16) + prompt (`onenote_triage`)
+## MCP tools (17) + prompt (`onenote_triage`)
 
 | Tool | Purpose |
 |------|---------|
@@ -17,6 +17,7 @@
 | `onenote_index_start` | Build/refresh the local full-text index (background). |
 | `onenote_index_status` | Index build progress and searchable page count. |
 | `onenote_get_notebook_toc` | Notebook table of contents (sections + pages). |
+| `onenote_recent` | Recently modified pages across notebooks (domain inbox). |
 | `show_notebooks_card` | Notebooks as an in-chat Prefab card. |
 | `onenote_help` | One-line usage for every tool. |
 | `shutdown_server` | Graceful server termination. |
