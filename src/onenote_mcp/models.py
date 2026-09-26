@@ -54,6 +54,7 @@ class TOCPage(BaseModel):
 class TOCSection(BaseModel):
     """Section entry in table of contents."""
 
+    id: str = ""
     name: str
     pageCount: int
     pages: list[TOCPage]

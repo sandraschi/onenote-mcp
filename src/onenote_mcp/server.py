@@ -404,6 +404,7 @@ async def get_notebook_toc(notebook_id: str) -> tuple[TOCData, list[str]]:
             return None
         return TOCSection(
             name=section.displayName,
+            id=section.id,
             pageCount=len(pages),
             pages=[
                 TOCPage(

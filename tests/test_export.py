@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from onenote_mcp.export_notes import build_export, html_to_markdown, job_status, safe_name
+from onenote_mcp.models import TOCSection
 
 
 def test_html_to_markdown_basics():
@@ -97,6 +98,12 @@ def test_build_export_writes_tree_and_index(tmp_path):
     assert hello.parent.name == "SecA" and hello.parent.parent.name == "My NB"
     assert body.startswith("---\ntitle: Hello") and "# Hi" in body
     assert job_status()["state"] in ("idle", "done")
+
+
+def test_toc_section_carries_id_for_export():
+    # Regression: export walks section.id - a missing id silently skips everything.
+    sec = TOCSection(id="s-1", name="S", pageCount=0, pages=[])
+    assert sec.id == "s-1"
 
 
 def test_build_export_notebook_filter(tmp_path):
