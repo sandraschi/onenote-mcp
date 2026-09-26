@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- Markdown backup: `onenote_export|export_status` tools + `POST /api/export`
+  + status (background job, per-notebook or all, front-matter Markdown +
+  index, Windows-safe names) + Settings backup section with progress.
+  19 tools total.
 - Grounded chat: `POST /api/llm/chat` accepts `context_ids` (up to 3 pages,
   stripped + truncated, injected as ground-truth system context); viewer
   "Ask about this page" deep-links to `/chat?with=` with a removable chip.

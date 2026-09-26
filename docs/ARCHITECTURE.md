@@ -74,7 +74,8 @@ swallowed into "failed").
   warning count instead of failing the whole load. Full-text body search runs
   on a local SQLite FTS5 index (`src/onenote_mcp/search_index.py`, DB in
   gitignored `data/`, incremental by modified stamp, built via
-  `POST /api/index` / `onenote_index_start`).
+  `POST /api/index` / `onenote_index_start`). Backups mirror the same walk
+  into Markdown (`src/onenote_mcp/export_notes.py`, `data/exports/`).
 - `$search` (full-text) is removed server-side for OneNote, so title match
   is the search semantic everywhere (results carry notebook/section).
 - Page bodies come from `.../pages/{id}/content` (metadata endpoint has no
