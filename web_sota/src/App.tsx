@@ -12,6 +12,7 @@ import { Dashboard } from "@/pages/dashboard";
 import { Help } from "@/pages/help";
 import Logging from "@/pages/Logging";
 import { Notebooks } from "@/pages/notebooks";
+import { Recent } from "@/pages/recent";
 import { SearchPage } from "@/pages/search";
 import { Settings } from "@/pages/settings";
 import { Skills } from "@/pages/skills";
@@ -26,6 +27,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/notebooks" element={<Notebooks />} />
+          <Route path="/recent" element={<Recent />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/status" element={<Status />} />

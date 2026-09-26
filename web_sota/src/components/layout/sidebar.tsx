@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Grid,
   HelpCircle,
+  History,
   LayoutDashboard,
   ScrollText,
   Search,
@@ -58,6 +59,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const navItems = [
     { href: "/", label: "Overview", icon: LayoutDashboard },
     { href: "/notebooks", label: "Notebooks", icon: BookOpen },
+    { href: "/recent", label: "Recent", icon: History },
     { href: "/search", label: "Search", icon: Search },
     { href: "/tools", label: "Tools", icon: Wrench },
     { href: "/status", label: "Status", icon: Shield },
