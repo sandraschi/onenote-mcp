@@ -21,7 +21,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `ONENOTE_LOG_LEVEL` | info | uvicorn log level |
 | `MCP_BRIDGE_URLS` | - | Comma-separated remote MCP URLs proxied via create_proxy |
 
-## MCP tools (17) + prompts (1)
+## MCP tools (19) + prompts (1)
 
 | Tool | Purpose |
 |------|---------|
@@ -39,6 +39,8 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API. Dual trans
 | `onenote_index_status` | Index build progress and searchable page count |
 | `onenote_get_notebook_toc` | Sections + pages overview |
 | `onenote_recent` | Recently modified pages (domain inbox) |
+| `onenote_export` | Back up notebooks to Markdown (background) |
+| `onenote_export_status` | Backup progress and output dir |
 | `show_notebooks_card` | Notebooks as an in-chat Prefab card |
 | `onenote_help` | Tool list and usage notes |
 | `shutdown_server` | Graceful server termination |
@@ -58,6 +60,7 @@ Prompt: `onenote_triage` - guided DISCOVER/RETRIEVE/MAP/CAPTURE triage.
 - `GET /api/notebooks`, `GET /api/notebooks/{id}/toc` — notebook browser
 - `GET /api/pages/{id}`, `POST /api/pages`, `GET /api/search?q=&mode=` — page content/creation/search (title or fulltext)
 - `POST /api/index`, `GET /api/index/status` — FTS index build + progress
+- `POST /api/export`, `GET /api/export/status` — Markdown backup + progress
 - `GET /api/skills`, `GET /api/skills/{name}` — skills list + SKILL.md content
 - `GET /api/fleet/apps` — Apps Hub registry (adjacent fleet webapps)
 - `GET /api/llm/discover` — local LLM probe (Ollama :11434, LM Studio :1234, vLLM :8000; `providers[].models`)

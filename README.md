@@ -17,7 +17,7 @@ for official links, community, and disambiguation from similarly-named projects.
 
 ## Two doors
 
-- **MCP server, for AI agents** — 17 tools + 1 prompt over stdio or
+- **MCP server, for AI agents** — 19 tools + 1 prompt over stdio or
   streamable HTTP (`:10907/mcp`): list/explore notebooks, read page HTML,
   create pages, title + full-text search, notebook TOC cards. Any MCP client
   (Claude Desktop, Cursor, Copilot) can browse and edit your notes.
@@ -31,6 +31,7 @@ for official links, community, and disambiguation from similarly-named projects.
 - Browse notebooks → sections → pages; read full page content rendered
 - Search titles instantly; build a local full-text index for body search
 - Create pages from plain text (paragraphs from blank lines)
+- Back up everything to Markdown files, any time
 - Ask the chat about your notes (local LLM via backend proxy, nothing leaks)
 - Run headless, as a Tauri desktop app, or from a `.mcpb` bundle
 
@@ -62,7 +63,7 @@ anything. Full paths: [INSTALL.md](INSTALL.md),
 | [Wrapped app](docs/WRAPPEE.md) | OneNote links, community, disambiguation |
 | [Architecture](docs/ARCHITECTURE.md) | System, auth chain, scope recipe, ports |
 | [Configuration](docs/CONFIGURATION.md) | Env vars, config options |
-| [Tool Reference](docs/TOOLS.md) | All 17 tools + prompt |
+| [Tool Reference](docs/TOOLS.md) | All 19 tools + prompt |
 | [Auth investigation](docs/AUTH_INVESTIGATION.md) | The 401 odyssey: evidence, verdicts |
 | [Development](docs/DEVELOPMENT.md) | Contributing, local setup |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues, diagnostics |

@@ -1,6 +1,6 @@
 # Tools
 
-## MCP tools (17) + prompt (`onenote_triage`)
+## MCP tools (19) + prompt (`onenote_triage`)
 
 | Tool | Purpose |
 |------|---------|
@@ -18,6 +18,8 @@
 | `onenote_index_status` | Index build progress and searchable page count. |
 | `onenote_get_notebook_toc` | Notebook table of contents (sections + pages). |
 | `onenote_recent` | Recently modified pages across notebooks (domain inbox). |
+| `onenote_export` | Back up notebooks to Markdown files (background). |
+| `onenote_export_status` | Backup progress, file count, output dir. |
 | `show_notebooks_card` | Notebooks as an in-chat Prefab card. |
 | `onenote_help` | One-line usage for every tool. |
 | `shutdown_server` | Graceful server termination. |
