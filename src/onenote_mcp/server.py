@@ -338,6 +338,49 @@ async def search_pages(query: str) -> list[Page]:
     return hits
 
 
+def select_recent(
+    items: list[tuple[str, str, str, str, str]], days: int, now: float | None = None
+) -> list[dict[str, str]]:
+    """Pure filter: (id, title, notebook, section, modified_iso) -> recent first.
+
+    Malformed/empty timestamps are skipped (never crash the feed on one bad row).
+    """
+    import datetime as _dt
+
+    cutoff = (now if now is not None else time.time()) - days * 86400
+    hits: list[tuple[float, dict[str, str]]] = []
+    for pid, title, notebook, section, modified in items:
+        try:
+            ts = _dt.datetime.fromisoformat((modified or "").replace("Z", "+00:00")).timestamp()
+        except (ValueError, TypeError):
+            continue
+        if ts >= cutoff:
+            hits.append(
+                (ts, {"id": pid, "title": title, "notebook": notebook, "section": section, "modified": modified})
+            )
+    hits.sort(key=lambda h: h[0], reverse=True)
+    return [h[1] for h in hits]
+
+
+async def recent_pages(days: int = 7, limit: int = 50) -> tuple[list[dict[str, str]], dict[str, int]]:
+    """Walk all notebook TOCs, return recently-modified pages + scan stats."""
+    days = max(1, min(days, 90))
+    items: list[tuple[str, str, str, str, str]] = []
+    scanned = {"notebooks": 0, "sections": 0}
+    for nb in await list_notebooks():
+        try:
+            toc, _ = await get_notebook_toc(nb.id)
+        except Exception as exc:
+            logger.warning("Recent skipped notebook %s: %s", nb.id, exc)
+            continue
+        scanned["notebooks"] += 1
+        for section in toc.sections:
+            scanned["sections"] += 1
+            for pg in section.pages:
+                items.append((pg.id, pg.title, nb.displayName, section.name, pg.modified))
+    return select_recent(items, days)[: max(1, min(limit, 200))], scanned
+
+
 async def get_notebook_toc(notebook_id: str) -> tuple[TOCData, list[str]]:
     """Generate table of contents for a notebook (sections fetched in parallel).
 
@@ -443,6 +486,7 @@ _TOOL_REGISTRY: tuple[str, ...] = (
     "onenote_search_pages",
     "onenote_index_start",
     "onenote_index_status",
+    "onenote_recent",
     "onenote_get_notebook_toc",
     "show_notebooks_card",
     "onenote_help",
@@ -1046,6 +1090,23 @@ async def _page_html(page_id: str) -> str:
     return (await get_page(page_id)).content or ""
 
 
+@app.custom_route("/api/recent", methods=["GET"])
+async def api_recent_pages(request: Request) -> JSONResponse:
+    try:
+        days = int(request.query_params.get("days", "7"))
+    except ValueError:
+        days = 7
+    try:
+        limit = int(request.query_params.get("limit", "50"))
+    except ValueError:
+        limit = 50
+    try:
+        pages, scanned = await recent_pages(days, limit)
+        return JSONResponse({"success": True, "days": days, "pages": pages, "scanned": scanned})
+    except Exception as exc:
+        return _error_response(exc)
+
+
 _BACKGROUND_TASKS: set[asyncio.Task] = set()
 
 
@@ -1383,6 +1444,34 @@ async def onenote_search_pages(
 
 
 @app.tool(annotations=_READONLY)
+async def onenote_recent(
+    days: Annotated[int, Field(description="Lookback window in days (1-90)")] = 7,
+) -> str:
+    """List recently modified pages across all notebooks.
+
+    The domain-inbox answer to "what changed": TOC walk, newest first.
+
+    ## Return Format
+    Markdown string with dated page entries (title, notebook/section, id).
+
+    ## Examples
+    onenote_recent()
+    onenote_recent(days=30)
+    """
+    try:
+        pages, scanned = await recent_pages(days)
+        if not pages:
+            return f"No pages modified in the last {days} days."
+        lines = [f"🕘 Recently modified (last {days} days, {scanned['notebooks']} notebooks scanned):\n"]
+        for p in pages:
+            day = (p["modified"] or "")[:10]
+            lines.append(f"- **{p['title']}** ({p['notebook']} / {p['section']}, {day}) `{p['id']}`")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ Recent failed: {e!s}"
+
+
+@app.tool(annotations=_READONLY)
 async def onenote_index_start() -> str:
     """Build (or refresh) the local full-text search index.
 
@@ -1481,7 +1570,7 @@ async def onenote_help() -> str:
     """List the available OneNote MCP tools and when to use each.
 
     ## Return Format
-    Markdown string enumerating the 16 tools with one-line usage notes.
+    Markdown string enumerating the 17 tools with one-line usage notes.
 
     ## Examples
     onenote_help()
@@ -1499,6 +1588,7 @@ async def onenote_help() -> str:
 - `onenote_search_pages` - title or full-text search across notebooks
 - `onenote_index_start` - build the full-text index (background)
 - `onenote_index_status` - index progress and coverage
+- `onenote_recent` - recently modified pages (domain inbox)
 - `onenote_get_notebook_toc` - sections + pages overview
 - `show_notebooks_card` - notebooks as an in-chat Prefab card
 - `shutdown_server` - stop the server"""
