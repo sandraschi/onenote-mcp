@@ -18,6 +18,7 @@ from fastmcp.tools.base import ToolResult
 from prefab_ui import PrefabApp
 from prefab_ui.components import Heading, Row, Text
 from pydantic import Field
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
@@ -1463,6 +1464,7 @@ async def onenote_create_page(
     try:
         result = await create_page(notebook_id, title, content)
         page_id = result.get("id", "unknown")
+        _log.info("mcp", f"onenote_create_page '{title}' -> {page_id}")
         return f"✅ Page '{title}' created successfully with ID: `{page_id}`"
     except Exception as e:
         return f"❌ Failed to create page: {e!s}"
@@ -1485,6 +1487,7 @@ async def onenote_append_page(
         if not content.strip():
             return "❌ Nothing to append - content is empty."
         await append_page_content(page_id, content)
+        _log.info("mcp", f"onenote_append_page -> {page_id} ({len(content)} chars)")
         return f"✅ Appended to page `{page_id}`"
     except Exception as e:
         return f"❌ Failed to append: {e!s}"
@@ -1753,19 +1756,49 @@ def onenote_skill() -> str:
 
 
 # ASGI app for uvicorn (fleet standard: serve mcp.http_app(), never the raw FastMCP object)
-http_app = CORSMiddleware(
-    app.http_app(),
-    allow_origins=[
-        "http://localhost:10906",
-        "http://127.0.0.1:10906",
-        "http://tauri.localhost",
-        "https://tauri.localhost",
-        "tauri://localhost",
-    ],
-    allow_origin_regex=r"https?://(?:[a-zA-Z0-9-]+\.ts\.net|.*?\.tail-[a-f0-9]+\.ts\.net|tauri\.localhost|localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?$|^tauri://localhost$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+class _AccessLogMiddleware(BaseHTTPMiddleware):
+    """Access log into the activity ring: every REST/MCP call, one line.
+
+    Skips health polls (dashboard background noise), the log endpoints
+    themselves (self-logging loop), and CORS preflights.
+    """
+
+    SKIP_PREFIXES = ("/health", "/api/v1/health", "/api/logs")
+
+    async def dispatch(self, request, call_next):
+        path = request.url.path
+        if request.method == "OPTIONS" or path.startswith(self.SKIP_PREFIXES):
+            return await call_next(request)
+        start = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            _log.error("http", f"{request.method} {path} -> 500 (crashed)")
+            raise
+        ms = (time.perf_counter() - start) * 1000
+        line = f"{request.method} {path} -> {response.status_code} ({ms:.0f}ms)"
+        if response.status_code >= 500:
+            _log.error("http", line)
+        else:
+            _log.info("http", line)
+        return response
+
+
+http_app = _AccessLogMiddleware(
+    CORSMiddleware(
+        app.http_app(),
+        allow_origins=[
+            "http://localhost:10906",
+            "http://127.0.0.1:10906",
+            "http://tauri.localhost",
+            "https://tauri.localhost",
+            "tauri://localhost",
+        ],
+        allow_origin_regex=r"https?://(?:[a-zA-Z0-9-]+\.ts\.net|.*?\.tail-[a-f0-9]+\.ts\.net|tauri\.localhost|localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?$|^tauri://localhost$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 )
 
 
