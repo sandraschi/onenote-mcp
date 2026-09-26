@@ -24,6 +24,8 @@ from starlette.responses import HTMLResponse, JSONResponse
 
 from . import search_index
 from .constants import AUTHORITY, CLIENT_ID, SCOPES, TOKEN_FILE_NAME
+from .export_notes import build_export as _build_export
+from .export_notes import job_status as _export_status
 from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -486,6 +488,8 @@ _TOOL_REGISTRY: tuple[str, ...] = (
     "onenote_search_pages",
     "onenote_index_start",
     "onenote_index_status",
+    "onenote_export",
+    "onenote_export_status",
     "onenote_recent",
     "onenote_get_notebook_toc",
     "show_notebooks_card",
@@ -1144,6 +1148,19 @@ def _spawn_index_build() -> bool:
     return True
 
 
+def _spawn_export(notebook_id: str = "") -> bool:
+    """Start a Markdown backup unless one runs. Returns True if started."""
+    if _export_status()["state"] == "running":
+        return False
+    task = asyncio.create_task(
+        _build_export(list_notebooks, get_notebook_toc, list_pages, get_page, notebook_id),
+        name="onenote-export",
+    )
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    return True
+
+
 @app.custom_route("/api/index", methods=["POST"])
 async def api_index_start(request: Request) -> JSONResponse:
     """Start (or restart) the full-text index build in the background."""
@@ -1155,6 +1172,24 @@ async def api_index_start(request: Request) -> JSONResponse:
 @app.custom_route("/api/index/status", methods=["GET"])
 async def api_index_status(request: Request) -> JSONResponse:
     return JSONResponse({"success": True, **search_index.job_status()})
+
+
+@app.custom_route("/api/export", methods=["POST"])
+async def api_export_start(request: Request) -> JSONResponse:
+    notebook_id = ""
+    try:
+        body = await request.json()
+        notebook_id = str(body.get("notebook_id") or "")
+    except Exception as exc:
+        logger.debug("Export start without JSON body: %s", exc)
+    if not _spawn_export(notebook_id):
+        return JSONResponse({"success": True, "status": "already running"})
+    return JSONResponse({"success": True, "status": "started"})
+
+
+@app.custom_route("/api/export/status", methods=["GET"])
+async def api_export_status(request: Request) -> JSONResponse:
+    return JSONResponse({"success": True, **_export_status()})
 
 
 @app.custom_route("/api/pages", methods=["POST"])
@@ -1249,6 +1284,45 @@ async def onenote_list_notebooks() -> str:
         return result
     except Exception as e:
         return f"❌ Failed to list notebooks: {e!s}"
+
+
+@app.tool(annotations=_READONLY)
+async def onenote_export(
+    notebook_id: Annotated[str, Field(description="Notebook ID, or empty for all notebooks")] = "",
+) -> str:
+    """Back up notebooks to Markdown files (one per page + index).
+
+    Writes to data/exports/<timestamp>/, runs in the background - check
+    onenote_export_status.
+
+    ## Return Format
+    Markdown string confirming started/already-running.
+
+    ## Examples
+    onenote_export()
+    onenote_export(notebook_id="0-ABC123...")
+    """
+    if not _spawn_export(notebook_id):
+        return "Export already running - check onenote_export_status."
+    return "Export started in the background - check onenote_export_status for progress."
+
+
+@app.tool(annotations=_READONLY)
+async def onenote_export_status() -> str:
+    """Show Markdown backup progress (files written, output dir).
+
+    ## Return Format
+    Markdown string with state, pages done/total, file count, output dir.
+
+    ## Examples
+    onenote_export_status()
+    """
+    st = _export_status()
+    return (
+        f"Export state: {st['state']} - {st['done']}/{st['total']} processed, "
+        f"{st['files']} files in {st['output_dir'] or '(no output yet)'}."
+        + (f" Error: {st['error']}" if st.get("error") else "")
+    )
 
 
 @app.tool(annotations=_READONLY)
@@ -1591,7 +1665,7 @@ async def onenote_help() -> str:
     """List the available OneNote MCP tools and when to use each.
 
     ## Return Format
-    Markdown string enumerating the 17 tools with one-line usage notes.
+    Markdown string enumerating the 19 tools with one-line usage notes.
 
     ## Examples
     onenote_help()
@@ -1610,6 +1684,8 @@ async def onenote_help() -> str:
 - `onenote_index_start` - build the full-text index (background)
 - `onenote_index_status` - index progress and coverage
 - `onenote_recent` - recently modified pages (domain inbox)
+- `onenote_export` - back up notebooks to Markdown files
+- `onenote_export_status` - backup progress and output dir
 - `onenote_get_notebook_toc` - sections + pages overview
 - `show_notebooks_card` - notebooks as an in-chat Prefab card
 - `shutdown_server` - stop the server"""
