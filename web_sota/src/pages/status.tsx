@@ -1,4 +1,11 @@
-import { Cloud, FileText, HardDrive, Shield } from "lucide-react";
+import {
+  BookOpen,
+  Cloud,
+  Database,
+  FileText,
+  HardDrive,
+  Shield,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,9 +19,18 @@ interface StatusPayload {
   providers?: { graph?: { authenticated?: boolean } };
 }
 
+interface IndexPayload {
+  state?: string;
+  total?: number;
+  done?: number;
+  indexed_pages?: number;
+}
+
 export function Status() {
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [index, setIndex] = useState<IndexPayload | null>(null);
+  const [notebookCount, setNotebookCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -33,6 +49,26 @@ export function Status() {
         }
       } catch {
         /* auth state optional */
+      }
+      try {
+        const ir = await fetch(`${API_BASE}/index/status`);
+        if (ir.ok) {
+          const id = (await ir.json()) as IndexPayload;
+          setIndex(id);
+        }
+      } catch {
+        /* index state optional */
+      }
+      try {
+        const nr = await fetch(`${API_BASE}/notebooks`);
+        if (nr.ok) {
+          const nd = (await nr.json()) as {
+            notebooks?: unknown[];
+          };
+          setNotebookCount(nd.notebooks?.length ?? null);
+        }
+      } catch {
+        /* notebook count optional */
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Backend unreachable");
@@ -85,7 +121,7 @@ export function Status() {
         </p>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="border-slate-800 bg-slate-950/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-200">
@@ -148,6 +184,49 @@ export function Status() {
             >
               {uptime}
             </div>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-800 bg-slate-950/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-200">
+              Notebooks
+            </CardTitle>
+            <BookOpen className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div
+              className="text-2xl font-bold text-white"
+              data-testid="status-notebooks"
+            >
+              {notebookCount ?? "-"}
+            </div>
+            <p className="text-sm text-slate-400">in your account</p>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-800 bg-slate-950/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-200">
+              Search index
+            </CardTitle>
+            <Database className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div
+              className="text-2xl font-bold text-white"
+              data-testid="status-index-count"
+            >
+              {index?.indexed_pages ?? "-"}
+            </div>
+            <p
+              className="text-sm text-slate-400"
+              data-testid="status-index-state"
+            >
+              {!index || index.state === "idle"
+                ? "pages indexed · build it from Search"
+                : index.state === "running"
+                  ? `indexing ${index.done}/${index.total}…`
+                  : `pages indexed · ${index.state}`}
+            </p>
           </CardContent>
         </Card>
       </div>
