@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Recent changes feed: `onenote_recent` tool + `GET /api/recent` (TOC walk,
+  newest first, 7/30-day window) + Recent page in sidebar (the domain inbox).
+  17 tools total.
+
 ## [1.0.4] - 2026-09-25
 
 ### Assfix 2026-09-25 (66 -> ~85, SOTA)

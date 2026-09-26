@@ -13,7 +13,7 @@ MCPB bundle (`mcpb/`). Ports 10906/10907 registered adjacent, never hardcoded
 | ASGI target | `http_app` in `server.py` | CORS-wrapped `app.http_app()` — the ONLY uvicorn target (raw `app` 500s everything) |
 | CLI transports | `src/onenote_mcp/transport.py` | stdio/http/sse for `python -m onenote_mcp` |
 | Frozen entry | `run_server.py` + `onenote-mcp-backend.spec` | PyInstaller sidecar for Tauri |
-| Webapp | `web_sota/src` (React, Zustand `store/llm.ts`, TanStack Query) | Dashboard, Notebooks, Search, Tools, Status, Apps, Skills, Chat (backend LLM proxy), Logging, Help, Settings |
+| Webapp | `web_sota/src` (React, Zustand `store/llm.ts`, TanStack Query) | Dashboard, Notebooks, Recent, Search, Tools, Status, Apps, Skills, Chat (backend LLM proxy), Logging, Help, Settings |
 | Desktop shell | `native/` (Rust + `backend.rs`) | Spawns backend exe, relays `backend-status`, health-polls |
 | Logging | `src/onenote_mcp/activity_log.py` | In-memory ring (2000), `/api/logs`, kind-filtered (`auth`, `http`, …) |
 
