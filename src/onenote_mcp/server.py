@@ -1331,7 +1331,21 @@ async def onenote_export_status() -> str:
 async def onenote_get_notebook(
     notebook_id: Annotated[str, Field(description="The ID of the notebook to retrieve")],
 ) -> str:
-    """Get details of a specific OneNote notebook.
+    """Get metadata of one OneNote notebook by ID.
+
+    ## When to use
+    - You already hold a notebook ID (from onenote_list_notebooks) and need its name or Graph URLs.
+    - You want to confirm an ID is valid before listing its sections.
+
+    ## When NOT to use
+    - To discover notebooks: use onenote_list_notebooks.
+    - To see sections or pages: use onenote_list_sections or onenote_get_notebook_toc.
+    - To read page content: use onenote_get_page.
+
+    ## Behavior
+    - Read-only: one Microsoft Graph GET (/me/onenote/notebooks/{id}); nothing is modified.
+    - Requires a signed-in Graph session; an unknown ID or expired auth is returned as a
+      string starting with "❌ Failed to get notebook:" (the tool does not raise).
 
     ## Return Format
     Markdown string with notebook name, ID, sections URL, and section groups URL.
@@ -1380,7 +1394,24 @@ async def onenote_list_sections(notebook_id: Annotated[str, Field(description="T
 
 @app.tool(annotations=_READONLY)
 async def onenote_list_pages(section_id: Annotated[str, Field(description="The ID of the section")]) -> str:
-    """List all pages in a OneNote section.
+    """List the pages in one OneNote section (titles, IDs, created/modified dates).
+
+    ## When to use
+    - You have a section ID (from onenote_list_sections) and want page titles and IDs
+      before calling onenote_get_page.
+    - You need modified dates to find recently edited pages in one section.
+
+    ## When NOT to use
+    - To search by text across notebooks: use onenote_search_pages.
+    - To see recent edits everywhere: use onenote_recent.
+    - To read a page body: use onenote_get_page.
+
+    ## Behavior
+    - Read-only: one Microsoft Graph GET (/me/onenote/sections/{id}/pages); nothing is modified.
+    - Not paginated: only the single Graph response is returned (Graph's default page size),
+      so a very large section may list fewer pages than it contains.
+    - Empty section returns "No pages found in this section"; failures (bad ID, expired
+      auth) return a string starting with "❌ Failed to list pages:" and do not raise.
 
     ## Return Format
     Markdown string: "📄 Pages in section:" with numbered pages, created and modified dates.
@@ -1698,6 +1729,20 @@ async def onenote_help() -> str:
 @app.tool(annotations=_READONLY)
 async def show_notebooks_card() -> ToolResult:
     """Show the user's OneNote notebooks as a rich in-chat card.
+
+    ## When to use
+    - The user asks to see or browse their notebooks and the host can render apps.
+
+    ## When NOT to use
+    - You need notebook data to act on programmatically: use onenote_list_notebooks
+      (same data, plain text).
+    - You need one notebook's details: use onenote_get_notebook.
+
+    ## Behavior
+    - Read-only: one Microsoft Graph GET listing notebooks; nothing is modified.
+    - Takes no arguments. Hosts without app support receive the markdown fallback only.
+    - No notebooks returns "No notebooks found"; failures (expired auth, network) return
+      "❌ Failed to list notebooks: ..." and do not raise.
 
     ## Return Format
     ToolResult: PrefabApp card with one row per notebook, plus a plain-text
