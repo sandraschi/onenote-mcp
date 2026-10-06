@@ -38,6 +38,7 @@ class Page(BaseModel):
     self: str
     contentUrl: str
     content: str | None = None
+    links: dict[str, Any] | None = None
     notebook: str | None = None
     section: str | None = None
 

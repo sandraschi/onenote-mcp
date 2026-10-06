@@ -8,7 +8,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import httpx
 import msal
@@ -27,6 +27,7 @@ from . import search_index
 from .constants import AUTHORITY, CLIENT_ID, SCOPES, TOKEN_FILE_NAME
 from .export_notes import build_export as _build_export
 from .export_notes import job_status as _export_status
+from .markup import html_to_markdown, markdown_to_html
 from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -241,7 +242,7 @@ async def list_pages(section_id: str) -> list[Page]:
     pages = []
     for page_data in await _get_all(f"/me/onenote/sections/{section_id}/pages"):
         # Extract title from content or use ID as fallback
-        title = page_data.get("title", f"Page {page_data['id'][:8]}")
+        title = page_data.get("title") or f"Page {page_data['id'][:8]}"
         pages.append(Page(**{**page_data, "title": title}))
 
     return pages
@@ -273,12 +274,13 @@ async def get_page(page_id: str, include_ids: bool = False) -> Page:
 
     return Page(
         id=page_data["id"],
-        title=page_data.get("title", f"Page {page_data['id'][:8]}"),
+        title=page_data.get("title") or f"Page {page_data['id'][:8]}",
         createdDateTime=page_data["createdDateTime"],
         lastModifiedDateTime=page_data["lastModifiedDateTime"],
         self=page_data["self"],
         contentUrl=page_data["contentUrl"],
         content=content,
+        links=page_data.get("links"),
     )
 
 
@@ -292,10 +294,11 @@ def text_to_html(text: str) -> str:
     return blocks or "<p></p>"
 
 
-async def append_page_content(page_id: str, text: str) -> None:
-    """Append plain-text paragraphs to the end of a OneNote page body."""
+async def append_page_content(page_id: str, text: str, markdown: bool = False) -> None:
+    """Append plain-text (or Markdown) paragraphs to the end of a OneNote page body."""
     client = await get_graph_client()
-    commands = [{"target": "body", "action": "append", "position": "after", "content": text_to_html(text)}]
+    content = markdown_to_html(text) if markdown else text_to_html(text)
+    commands = [{"target": "body", "action": "append", "position": "after", "content": content}]
     response = await client.patch(f"/me/onenote/pages/{page_id}/content", json=commands)
     response.raise_for_status()
 
@@ -365,6 +368,41 @@ async def create_section_group(notebook_id: str, name: str) -> dict[str, Any]:
 async def list_section_groups(notebook_id: str) -> list[dict[str, Any]]:
     """List the section groups directly under a notebook."""
     return await _get_all(f"/me/onenote/notebooks/{notebook_id}/sectionGroups")
+
+
+_LINK_KINDS = {"notebook": "notebooks", "section": "sections", "page": "pages"}
+
+
+async def get_links(kind: str, item_id: str) -> dict[str, str]:
+    """Return {name, client_url, web_url} for a notebook, section or page.
+
+    client_url is an `onenote:` URI that opens the desktop app; web_url opens OneNote on the web.
+    """
+    if kind not in _LINK_KINDS:
+        raise ValueError(f"kind must be one of {sorted(_LINK_KINDS)}, got {kind!r}")
+    client = await get_graph_client()
+    response = await client.get(f"/me/onenote/{_LINK_KINDS[kind]}/{item_id}")
+    response.raise_for_status()
+    data = response.json()
+    links = data.get("links") or {}
+    return {
+        "name": data.get("displayName") or data.get("title") or "",
+        "client_url": (links.get("oneNoteClientUrl") or {}).get("href", ""),
+        "web_url": (links.get("oneNoteWebUrl") or {}).get("href", ""),
+    }
+
+
+def _link_lines(links: dict[str, Any] | None) -> str:
+    """Two display lines (web link, app link) from a Graph `links` object, or '' if none."""
+    links = links or {}
+    web = (links.get("oneNoteWebUrl") or {}).get("href", "")
+    app_url = (links.get("oneNoteClientUrl") or {}).get("href", "")
+    lines = []
+    if web:
+        lines.append(f"**Open in OneNote (web):** {web}")
+    if app_url:
+        lines.append(f"**Open in OneNote (app):** {app_url}")
+    return "".join(f"{line}\n" for line in lines)
 
 
 async def delete_page(page_id: str) -> None:
@@ -1577,47 +1615,56 @@ async def onenote_get_page(
         bool,
         Field(description="Stamp every element with its Graph id so onenote_update_page can target it"),
     ] = False,
+    output_format: Annotated[
+        Literal["html", "markdown"],
+        Field(
+            description="'html' = raw page HTML (default); 'markdown' = readable Markdown (to-dos become - [ ] items)"
+        ),
+    ] = "html",
 ) -> str:
-    """Get the complete HTML content of a OneNote page.
-
-    Retrieves the full page content including text, formatting, and embedded elements.
+    """Get the content of a OneNote page as HTML or Markdown, with its OneNote links.
 
     ## When to use
-    - You need to read a page, or find element IDs before an element-level onenote_update_page
-      (set include_ids=True).
+    - You need to read a page. Use output_format="markdown" for the most readable text.
+    - You need element IDs before an element-level onenote_update_page (include_ids=True, HTML only).
 
     ## When NOT to use
     - To find a page by text: use onenote_search_pages.
     - To list pages in a section: use onenote_list_pages (cheaper, no bodies).
+    - To get only the link to open a page: use onenote_get_links.
 
     ## Behavior
     - Read-only: GET .../pages/{id} plus GET .../pages/{id}/content; nothing is modified.
-    - Returns raw HTML (not Markdown); include_ids=True adds an id attribute to each element.
+    - Markdown is a lossy reading view (images become ![alt](url); styling and layout are dropped);
+      use HTML when you plan to edit by element. include_ids cannot be combined with markdown.
     - If the body fetch fails the page metadata is still returned, marked content not available.
     - Errors return "❌ Failed to get page content: ..." (no raise).
 
     ## Return Format
-    Markdown string: "📄 Page Content:" with title, ID, timestamps, and the raw HTML body.
+    Markdown string: "📄 Page Content:" with title, ID, timestamps, OneNote web/app links, then the body.
 
     ## Examples
     onenote_get_page(page_id="0-PG123...")
+    onenote_get_page(page_id="0-PG123...", output_format="markdown")
     onenote_get_page(page_id="0-PG123...", include_ids=True)
     """
     try:
+        if include_ids and output_format == "markdown":
+            return "❌ include_ids only applies to HTML output - use output_format='html' to get element IDs."
         page = await get_page(page_id, include_ids)
+        link_lines = _link_lines(page.links)
         if page.content:
-            # For now, return the HTML content
-            # TODO: Convert HTML to markdown for better readability
+            body = html_to_markdown(page.content) if output_format == "markdown" else page.content
             return f"""📄 Page Content:
 
 **Title:** {page.title}
 **ID:** {page.id}
 **Created:** {page.createdDateTime}
 **Modified:** {page.lastModifiedDateTime}
-
+{link_lines}
 ---
 
-{page.content}
+{body}
 """
         else:
             return f"""📄 Page Info:
@@ -1637,11 +1684,17 @@ async def onenote_get_page(
 async def onenote_create_page(
     notebook_id: Annotated[str, Field(description="The ID of the notebook to create the page in")],
     title: Annotated[str, Field(description="The title of the new page")],
-    content: Annotated[str, Field(description="Optional HTML content for the page")] = "",
+    content: Annotated[str, Field(description="Optional page body, in the format given by content_format")] = "",
     section_id: Annotated[
         str | None,
         Field(description="Section to create the page in. Default: the notebook's default section, else its first"),
     ] = None,
+    content_format: Annotated[
+        Literal["html", "markdown"],
+        Field(
+            description="'html' (default) inserts content as raw HTML; 'markdown' renders it (- [ ] items become to-dos)"
+        ),
+    ] = "html",
 ) -> str:
     """Create a new page in a OneNote notebook (in a chosen section, or its default section).
 
@@ -1655,7 +1708,10 @@ async def onenote_create_page(
     ## Behavior
     - Writes to OneNote via Microsoft Graph (POST .../sections/{id}/pages); not idempotent,
       so a retry creates a duplicate page.
-    - The title is HTML-escaped; `content` is inserted as raw HTML, so escape any untrusted text.
+    - The title is HTML-escaped. With content_format="html" `content` is inserted as raw HTML (escape
+      any untrusted text); with "markdown" it is rendered and any raw HTML in it is escaped, not kept.
+    - OneNote restyles on save: bold/italic/code become styled spans and block quotes become plain
+      paragraphs (verified live), so a read-back shows the same text without the quote marker.
     - A notebook with no sections fails with a message telling you to create one.
     - Errors come back as a string starting with "❌ Failed to create page:" (no raise).
 
@@ -1665,9 +1721,11 @@ async def onenote_create_page(
     ## Examples
     onenote_create_page(notebook_id="0-ABC123...", title="Meeting Notes", content="<p>Agenda</p>")
     onenote_create_page(notebook_id="0-ABC123...", title="Idea", section_id="0-SEC123...")
+    onenote_create_page(notebook_id="0-ABC123...", title="Plan", content="# Goals\\n- [ ] ship", content_format="markdown")
     """
     try:
-        result = await create_page(notebook_id, title, content, section_id)
+        body = markdown_to_html(content) if content_format == "markdown" and content.strip() else content
+        result = await create_page(notebook_id, title, body, section_id)
         page_id = result.get("id", "unknown")
         _log.info("mcp", f"onenote_create_page '{title}' -> {page_id}")
         return f"✅ Page '{title}' created successfully with ID: `{page_id}`"
@@ -1678,20 +1736,38 @@ async def onenote_create_page(
 @app.tool(annotations=_MUTATING)
 async def onenote_append_page(
     page_id: Annotated[str, Field(description="The ID of the page to append to")],
-    content: Annotated[str, Field(description="Plain text to append (blank lines = paragraphs)")],
+    content: Annotated[str, Field(description="Text to append (plain: blank lines = paragraphs; or Markdown)")],
+    content_format: Annotated[
+        Literal["text", "markdown"],
+        Field(description="'text' (default) = plain paragraphs, HTML-escaped; 'markdown' = rendered Markdown"),
+    ] = "text",
 ) -> str:
-    """Append plain text to the end of a OneNote page.
+    """Append plain text or Markdown to the end of a OneNote page.
+
+    ## When to use
+    - Adding a note, log line, or checklist to the bottom of an existing page.
+
+    ## When NOT to use
+    - To change or insert content in the middle of a page: use onenote_update_page.
+    - To create a new page: use onenote_create_page.
+
+    ## Behavior
+    - Writes to OneNote via Microsoft Graph (PATCH .../pages/{id}/content, action=append); not
+      idempotent, so a retry appends twice. Existing content is never altered.
+    - Text is HTML-escaped; Markdown is rendered with raw HTML escaped (- [ ] items become to-dos).
+    - Errors return "❌ Failed to append: ..." (no raise).
 
     ## Return Format
     Confirmation string: "✅ Appended to page `<id>`".
 
     ## Examples
     onenote_append_page(page_id="0-PG123...", content="Follow-up note\\n\\nSecond paragraph")
+    onenote_append_page(page_id="0-PG123...", content="## Next\\n- [ ] call Sam", content_format="markdown")
     """
     try:
         if not content.strip():
             return "❌ Nothing to append - content is empty."
-        await append_page_content(page_id, content)
+        await append_page_content(page_id, content, markdown=content_format == "markdown")
         _log.info("mcp", f"onenote_append_page -> {page_id} ({len(content)} chars)")
         return f"✅ Appended to page `{page_id}`"
     except Exception as e:
@@ -1854,8 +1930,14 @@ async def onenote_update_page(
         Field(description="Where to apply the change: 'body', 'title', '#<data-id>' or a Graph-generated element ID"),
     ],
     action: Annotated[str, Field(description="One of: append, prepend, insert, replace")],
-    content: Annotated[str, Field(description="HTML to apply (required)")],
+    content: Annotated[str, Field(description="Content to apply (required), in the format given by content_format")],
     position: Annotated[str | None, Field(description="'before' or 'after'; only meaningful for action=insert")] = None,
+    content_format: Annotated[
+        Literal["html", "markdown"],
+        Field(
+            description="'html' (default) sends content as-is; 'markdown' renders it first. Ignored for target='title'"
+        ),
+    ] = "html",
 ) -> str:
     """Edit part of an existing page by element (replace a paragraph, insert, retitle).
 
@@ -1883,14 +1965,60 @@ async def onenote_update_page(
     onenote_update_page(page_id="0-PG123...", target="title", action="replace", content="New title")
     onenote_update_page(page_id="0-PG123...", target="p:{abc}{42}", action="replace", content="<p>Fixed text</p>")
     onenote_update_page(page_id="0-PG123...", target="body", action="append", content="<p>Done</p>")
+    onenote_update_page(page_id="0-PG123...", target="p:{abc}{42}", action="replace", content="**Fixed**", content_format="markdown")
     """
     try:
+        if content_format == "markdown" and target.strip() != "title" and content.strip():
+            content = markdown_to_html(content)
         command = build_patch_command(target, action, content, position)
         await update_page_content(page_id, command)
         _log.info("mcp", f"onenote_update_page {action} {target} -> {page_id}")
         return f"✅ Page `{page_id}` updated ({action} on {target})"
     except Exception as e:
         return f"❌ Failed to update page: {e!s}"
+
+
+@app.tool(annotations=_READONLY)
+async def onenote_get_links(
+    kind: Annotated[Literal["notebook", "section", "page"], Field(description="What the ID refers to")],
+    item_id: Annotated[str, Field(description="The ID of the notebook, section or page")],
+) -> str:
+    """Get the links that open a notebook, section or page in OneNote (web and desktop app).
+
+    ## When to use
+    - You want to hand the user a clickable link to something you found, created or edited.
+
+    ## When NOT to use
+    - To read content: use onenote_get_page. To list items: use onenote_list_notebooks,
+      onenote_list_sections or onenote_list_pages.
+
+    ## Behavior
+    - Read-only: one Microsoft Graph GET on the item; nothing is modified.
+    - The web link opens OneNote in a browser. The app link is an `onenote:` URI that opens the
+      installed desktop OneNote app; it only works on machines that have it.
+    - Pages and notebooks return links; sections returned none when tested on a personal account
+      (then the message says so - link the page or notebook instead).
+    - Errors (unknown ID, wrong kind, expired auth) return "❌ Failed to get links: ..." (no raise).
+
+    ## Return Format
+    Markdown string: the item name, then "Open in OneNote (web)" and "Open in OneNote (app)" URLs.
+
+    ## Examples
+    onenote_get_links(kind="page", item_id="0-PG123...")
+    onenote_get_links(kind="notebook", item_id="0-NB123...")
+    """
+    try:
+        info = await get_links(kind, item_id)
+        if not (info["web_url"] or info["client_url"]):
+            return f"No links returned for this {kind}."
+        lines = [f"🔗 {kind.capitalize()}: **{info['name']}**"]
+        if info["web_url"]:
+            lines.append(f"**Open in OneNote (web):** {info['web_url']}")
+        if info["client_url"]:
+            lines.append(f"**Open in OneNote (app):** {info['client_url']}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ Failed to get links: {e!s}"
 
 
 @app.tool(annotations=_DESTRUCTIVE)
@@ -2120,6 +2248,7 @@ async def onenote_help() -> str:
 - `onenote_append_page` - append plain text to a page
 - `onenote_update_page` - replace/insert/prepend/append on one element, or retitle a page
 - `onenote_delete_page` - permanently delete a page
+- `onenote_get_links` - web/app links to open a notebook, section or page
 - `onenote_create_notebook` - create a notebook (Graph cannot rename/delete it later)
 - `onenote_create_section` - create a section in a notebook
 - `onenote_create_section_group` - create a section group in a notebook

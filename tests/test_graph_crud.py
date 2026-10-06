@@ -18,32 +18,6 @@ NB = {
 SEC = {"id": "sec1", "displayName": "Notes", "pagesUrl": f"{GRAPH}/me/onenote/sections/sec1/pages", "self": "s"}
 
 
-@pytest.fixture
-def graph(monkeypatch):
-    """Route server.get_graph_client() to a MockTransport; collect every request made."""
-    calls: list[httpx.Request] = []
-    routes: dict[tuple[str, str], httpx.Response | callable] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        calls.append(request)
-        route = routes.get((request.method, request.url.path))
-        if route is None:
-            return httpx.Response(404, json={"error": {"message": f"no mock for {request.method} {request.url.path}"}})
-        return route(request) if callable(route) else route
-
-    client = httpx.AsyncClient(
-        base_url=GRAPH,
-        transport=httpx.MockTransport(handler),
-        event_hooks={"response": [server._explain_graph_error]},  # same hook as production
-    )
-
-    async def fake_client():
-        return client
-
-    monkeypatch.setattr(server, "get_graph_client", fake_client)
-    return calls, routes
-
-
 def _body(request: httpx.Request):
     return json.loads(request.content)
 
@@ -275,6 +249,7 @@ NEW_TOOLS = {
     "onenote_list_section_groups",
     "onenote_update_page",
     "onenote_delete_page",
+    "onenote_get_links",
 }
 
 

@@ -10,6 +10,40 @@ src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 
+@pytest.fixture
+def graph(monkeypatch):
+    """Route server.get_graph_client() to an httpx.MockTransport (no network).
+
+    Returns (calls, routes): every request made, and a {(METHOD, path): Response | callable} table
+    the test fills in. Unmocked requests get a 404 so a stray call fails loudly.
+    """
+    import httpx
+
+    from onenote_mcp import server
+
+    calls: list[httpx.Request] = []
+    routes: dict[tuple[str, str], object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        route = routes.get((request.method, request.url.path))
+        if route is None:
+            return httpx.Response(404, json={"error": {"message": f"no mock for {request.method} {request.url.path}"}})
+        return route(request) if callable(route) else route
+
+    client = httpx.AsyncClient(
+        base_url="https://graph.microsoft.com/v1.0",
+        transport=httpx.MockTransport(handler),
+        event_hooks={"response": [server._explain_graph_error]},  # same hook as production
+    )
+
+    async def fake_client():
+        return client
+
+    monkeypatch.setattr(server, "get_graph_client", fake_client)
+    return calls, routes
+
+
 # Test fixtures for OneNote testing
 @pytest.fixture
 def mock_microsoft_graph():
