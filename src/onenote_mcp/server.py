@@ -627,7 +627,7 @@ async def api_v1_health(request: Request) -> JSONResponse:
             "server": "onenote-mcp",
             "version": _SERVER_VERSION,
             "uptime_seconds": int(time.monotonic() - _START_TIME),
-            "tool_count": _tool_count(),
+            "tool_count": await _tool_count(),
         }
     )
 
@@ -649,39 +649,19 @@ _TAGGED_SKILLS: list[dict[str, str]] = [{"name": "onenote", "uri": "skill://onen
 _HELP_TOOLS: list[dict[str, str]] = []
 
 
-_TOOL_REGISTRY: tuple[str, ...] = (
-    "authenticate",
-    "onenote_save_access_token",
-    "onenote_list_notebooks",
-    "onenote_get_notebook",
-    "onenote_list_sections",
-    "onenote_list_pages",
-    "onenote_get_page",
-    "onenote_create_page",
-    "onenote_append_page",
-    "onenote_search_pages",
-    "onenote_index_start",
-    "onenote_index_status",
-    "onenote_export",
-    "onenote_export_status",
-    "onenote_recent",
-    "onenote_get_notebook_toc",
-    "show_notebooks_card",
-    "onenote_help",
-    "shutdown_server",
-)
+async def _list_mcp_tools() -> list[dict[str, str]]:
+    """Registered MCP tools, read from FastMCP itself.
+
+    This used to be a hand-kept name tuple that silently drifted (19 reported while 26 were
+    registered), so health/status/capabilities now ask the app.
+    """
+    return [
+        {"name": t.name, "description": (t.description or "").strip().split("\n", 1)[0]} for t in await app.list_tools()
+    ]
 
 
-def _list_mcp_tools() -> list[dict[str, str]]:
-    """Return registered MCP tools as name/description dicts."""
-    try:
-        return [{"name": name, "description": ""} for name in _TOOL_REGISTRY]
-    except Exception:
-        return [{"name": name, "description": ""} for name in _TOOL_REGISTRY]
-
-
-def _tool_count() -> int:
-    return len(_list_mcp_tools())
+async def _tool_count() -> int:
+    return len(await _list_mcp_tools())
 
 
 @app.custom_route("/api/status", methods=["GET"])
@@ -692,7 +672,7 @@ async def api_status(request: Request) -> JSONResponse:
             "server": "onenote-mcp",
             "version": _SERVER_VERSION,
             "uptime_seconds": int(time.monotonic() - _START_TIME),
-            "tool_count": _tool_count(),
+            "tool_count": await _tool_count(),
             "providers": {"graph": {"authenticated": bool(load_access_token())}},
         }
     )
@@ -714,7 +694,7 @@ async def api_capabilities(request: Request) -> JSONResponse:
                 "chat": True,
                 "skills": True,
             },
-            "tools": [t["name"] for t in _list_mcp_tools()],
+            "tools": [t["name"] for t in await _list_mcp_tools()],
         }
     )
 
@@ -921,8 +901,8 @@ async def api_diagnostics(request: Request) -> JSONResponse:
             "server": "onenote-mcp",
             "version": _SERVER_VERSION,
             "uptime_seconds": int(time.monotonic() - _START_TIME),
-            "tool_count": _tool_count(),
-            "tools": [{"name": t["name"]} for t in _list_mcp_tools()],
+            "tool_count": await _tool_count(),
+            "tools": [{"name": t["name"]} for t in await _list_mcp_tools()],
             "system": {"windows": sys.platform == "win32"},
             "errors": [],
         }

@@ -37,3 +37,19 @@ async def test_health_check():
         assert b"healthy" in response.body
     except ImportError:
         pytest.skip("Server import failed")
+
+
+@pytest.mark.asyncio
+async def test_status_endpoints_report_the_real_tool_list():
+    """Regression: a hand-kept tool tuple reported 19 tools while 26 were registered."""
+    import json
+
+    from onenote_mcp import server
+
+    registered = {t.name for t in await server.app.list_tools()}
+    request = MagicMock()
+    health = json.loads((await server.api_v1_health(request)).body)
+    status = json.loads((await server.api_status(request)).body)
+    caps = json.loads((await server.api_capabilities(request)).body)
+    assert health["tool_count"] == status["tool_count"] == len(registered)
+    assert set(caps["tools"]) == registered
