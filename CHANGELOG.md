@@ -29,6 +29,13 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 - `tests/test_graph_crud.py`: 18 mocked-Graph tests (no live OneNote needed).
 
 ### Fixed
+- `/api/v1/health`, `/api/status`, `/api/capabilities` and `/api/diagnostics` reported a hand-kept
+  list of 19 tools while 26 were registered (found by running the packed bundle). They now read
+  the tool list from FastMCP; a regression test compares them with `list_tools()`.
+- `mcpb/pyproject.toml` (the dependency set the bundle installs) was stale: no `markdown-it-py`,
+  `fastmcp>=3.2`, version 1.0.0. Aligned with the root project.
+- Bundle prompts (`mcpb/assets/prompts`) covered 12 of 19 tools; now 26 of 26 (138 examples, each
+  validated against the live tool schema), plus 1.1 sections in `system.md` and `user.md`.
 - A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - `onenote_create_page` posted to `/notebooks/{id}/pages`, which Graph does not document;
   it now creates the page in `section_id` (new optional arg) or the notebook's default
