@@ -33,7 +33,7 @@ FastMCP 3.4 server for Microsoft OneNote via the Microsoft Graph API.
 
 ## Session Context
 
-You have access to OneNote notebooks via Microsoft Graph (12 tools).
+You have access to OneNote notebooks via Microsoft Graph (27 tools).
 Before starting work on notes: `onenote_list_notebooks()` to find the notebook,
 then `onenote_get_notebook_toc()` for structure.
 At end of work: `onenote_create_page()` to persist notes; `onenote_save_access_token()`

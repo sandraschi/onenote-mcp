@@ -1,6 +1,6 @@
 # Tools
 
-## MCP tools (19) + prompt (`onenote_triage`)
+## MCP tools (27) + prompt (`onenote_triage`)
 
 | Tool | Purpose |
 |------|---------|
@@ -11,8 +11,16 @@
 | `onenote_list_sections` | Sections of a notebook. |
 | `onenote_list_pages` | Pages of a section. |
 | `onenote_get_page` | Full HTML content of a page. |
-| `onenote_create_page` | Create a page (HTML body) in a notebook. |
+| `onenote_create_page` | Create a page (HTML body) in a section (`section_id`) or the notebook's default section. |
 | `onenote_append_page` | Append plain text to a page (paragraphs from blank lines). |
+| `onenote_update_page` | Edit one element of a page (replace/insert/delete/append/prepend) or retitle it. |
+| `onenote_delete_page` | Permanently delete a page (DESTRUCTIVE). |
+| `onenote_create_notebook` | Create a notebook. Graph cannot rename or delete it afterwards. |
+| `onenote_create_section` | Create a section in a notebook. Graph cannot rename or delete it afterwards. |
+| `onenote_create_section_group` | Create a section group in a notebook. |
+| `onenote_list_section_groups` | Section groups of a notebook. |
+| `onenote_copy_section` | Copy a section into a notebook (async; returns an operation URL). |
+| `onenote_copy_status` | Progress of a section copy. |
 | `onenote_search_pages` | Title (`mode="title"`) or FTS body search (`mode="fulltext"`). |
 | `onenote_index_start` | Build/refresh the local full-text index (background). |
 | `onenote_index_status` | Index build progress and searchable page count. |
@@ -24,10 +32,16 @@
 | `onenote_help` | One-line usage for every tool. |
 | `shutdown_server` | Graceful server termination. |
 
-All tools are read-only except `onenote_create_page` / `onenote_append_page`
-(MUTATING), `onenote_save_access_token` / `authenticate` (MUTATING) and
-`shutdown_server` (DESTRUCTIVE). Every tool requires a valid Graph token
-unless it is `authenticate` itself.
+Annotations use the real MCP hints (`readOnlyHint`, `destructiveHint`, `openWorldHint`):
+read-only tools list/get/search/status; MUTATING (non-destructive writes) are the
+create/append/update/copy tools, `onenote_export`, `onenote_index_start`, `authenticate`
+and `onenote_save_access_token`; DESTRUCTIVE are `onenote_delete_page` and `shutdown_server`.
+Every tool requires a valid Graph token unless it is `authenticate` itself.
+
+**Graph limits (v1.0):** there is no endpoint to delete or rename a notebook, section or
+section group, so this server deliberately offers none. Pages can be created, edited,
+deleted and sections copied. Notebook names: max 128 chars, no `? * \ / : < > | ' "`;
+section and group names: max 50 chars, no `? * \ / : < > | & # ' % ~`.
 
 ## REST API (backend 10907)
 

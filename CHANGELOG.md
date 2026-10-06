@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.1.0] - 2026-10-06
+
+Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and weak
+`behavior` / `usage_guidelines` tool-description scores. 19 -> 27 tools.
+
+### Added
+- `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`,
+  `onenote_list_section_groups`, `onenote_update_page` (PATCH one element / retitle),
+  `onenote_delete_page`, `onenote_copy_section` + `onenote_copy_status` (async copy).
+  Names are validated locally against Graph's documented rules before any request.
+- `tests/test_graph_crud.py`: 24 mocked-Graph tests (no live OneNote needed).
+
+### Fixed
+- `onenote_create_page` posted to `/notebooks/{id}/pages`, which Graph does not document;
+  it now creates the page in `section_id` (new optional arg) or the notebook's default
+  section. The title is now HTML-escaped.
+- `onenote_list_pages` / `onenote_list_sections` ignored `@odata.nextLink`, silently
+  truncating large sections (verified live: a 26-page section returned 20).
+- Tool annotations used the non-standard `{"readonly": True}`, so every tool advertised
+  `readOnlyHint=None`. Now real MCP hints (`readOnlyHint`, `destructiveHint`,
+  `openWorldHint`); `onenote_export` and `onenote_index_start` are no longer marked read-only.
+
+### Changed
+- Docstrings for `onenote_get_notebook`, `onenote_list_pages`, `show_notebooks_card` and
+  all new tools carry When to use / When NOT to use / Behavior sections.
+
+### Not added (Graph v1.0 has no endpoint)
+- Deleting or renaming a notebook, section or section group.
+
 ## [1.0.4] - 2026-09-26
 
 ### Added
