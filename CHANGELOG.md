@@ -113,7 +113,6 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
   disabled + dimmed until signed in.
 
 ### Fixed
-- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - Launcher `UvicornTarget :app` regression (500s) - restored `:http_app`.
 - Cached Graph client surviving re-auth (eternal 401s); MSAL deprecated-API
   crash in callback ("Invalid parameter type"); reserved-scope 500 in
@@ -137,7 +136,6 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 ## [1.0.3] - 2026-09-24 (assfix)
 
 ### Fixed
-- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - Launcher failure: worktree `fleet-start.config.ps1` had regressed
   `UvicornTarget` to the raw FastMCP `server:app` (every route 500'd);
   restored to `server:http_app`, `WebRoot` made relative. Verified
@@ -171,7 +169,6 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 ## [1.0.1] - 2026-08-01 (assfix follow-up)
 
 ### Fixed
-- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - Settings page LLM section called non-existent `/api/llm/providers` and fell back
   to a hardcoded `llama3.2:3b` mock; rewired to the real `/api/llm/discover` with a
   graceful "no local LLM detected" state and no fake model data.
@@ -207,7 +204,6 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 ## [1.0.0] - 2026-08-01
 
 ### Fixed
-- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - ASGI crash (`TypeError: 'FastMCP' object is not callable`): uvicorn target now
   `onenote_mcp.server:http_app` (CORS-wrapped `app.http_app()`), fixed in
   `fleet-start.config.ps1`, `transport.py` (uvicorn.Server instead of `run_http_async`),
