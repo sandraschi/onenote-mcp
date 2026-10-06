@@ -1,6 +1,6 @@
 # Tools
 
-## MCP tools (27) + prompt (`onenote_triage`)
+## MCP tools (25) + prompt (`onenote_triage`)
 
 | Tool | Purpose |
 |------|---------|
@@ -13,14 +13,12 @@
 | `onenote_get_page` | Full HTML content of a page. |
 | `onenote_create_page` | Create a page (HTML body) in a section (`section_id`) or the notebook's default section. |
 | `onenote_append_page` | Append plain text to a page (paragraphs from blank lines). |
-| `onenote_update_page` | Edit one element of a page (replace/insert/delete/append/prepend) or retitle it. |
+| `onenote_update_page` | Edit one element of a page (replace/insert/prepend/append) or retitle it. |
 | `onenote_delete_page` | Permanently delete a page (DESTRUCTIVE). |
 | `onenote_create_notebook` | Create a notebook. Graph cannot rename or delete it afterwards. |
 | `onenote_create_section` | Create a section in a notebook. Graph cannot rename or delete it afterwards. |
 | `onenote_create_section_group` | Create a section group in a notebook. |
 | `onenote_list_section_groups` | Section groups of a notebook. |
-| `onenote_copy_section` | Copy a section into a notebook (async; returns an operation URL). |
-| `onenote_copy_status` | Progress of a section copy. |
 | `onenote_search_pages` | Title (`mode="title"`) or FTS body search (`mode="fulltext"`). |
 | `onenote_index_start` | Build/refresh the local full-text index (background). |
 | `onenote_index_status` | Index build progress and searchable page count. |
@@ -34,13 +32,18 @@
 
 Annotations use the real MCP hints (`readOnlyHint`, `destructiveHint`, `openWorldHint`):
 read-only tools list/get/search/status; MUTATING (non-destructive writes) are the
-create/append/update/copy tools, `onenote_export`, `onenote_index_start`, `authenticate`
+create/append/update tools, `onenote_export`, `onenote_index_start`, `authenticate`
 and `onenote_save_access_token`; DESTRUCTIVE are `onenote_delete_page` and `shutdown_server`.
 Every tool requires a valid Graph token unless it is `authenticate` itself.
 
-**Graph limits (v1.0):** there is no endpoint to delete or rename a notebook, section or
-section group, so this server deliberately offers none. Pages can be created, edited,
-deleted and sections copied. Notebook names: max 128 chars, no `? * \ / : < > | ' "`;
+**Graph limits (v1.0, verified live on a personal Microsoft account 2026-10-06):** there is no
+endpoint to delete or rename a notebook, section or section group, so this server
+deliberately offers none. Pages can be created, edited element-wise (replace/insert/
+prepend/append; `delete` is rejected with 20122, so blank an element by replacing it with
+an empty paragraph) and deleted. Section copy (`copyToNotebook`) returns
+`501 OData Feature not implemented` on personal accounts, so it is not offered; it may work
+on work/school accounts (untested). Use `onenote_get_page(include_ids=True)` to get the
+element IDs `onenote_update_page` targets. Notebook names: max 128 chars, no `? * \ / : < > | ' "`;
 section and group names: max 50 chars, no `? * \ / : < > | & # ' % ~`.
 
 ## REST API (backend 10907)

@@ -3,13 +3,16 @@
 ## [1.1.0] - 2026-10-06
 
 Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and weak
-`behavior` / `usage_guidelines` tool-description scores. 19 -> 27 tools.
+`behavior` / `usage_guidelines` tool-description scores. 19 -> 25 tools.
 
 ### Added
 - `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`,
   `onenote_list_section_groups`, `onenote_update_page` (PATCH one element / retitle),
-  `onenote_delete_page`, `onenote_copy_section` + `onenote_copy_status` (async copy).
-  Names are validated locally against Graph's documented rules before any request.
+  `onenote_delete_page`. Names are validated locally against Graph's documented rules
+  before any request. All verified live against a real account.
+- `onenote_get_page(include_ids=True)`: stamps element ids, which `onenote_update_page` needs.
+- Graph error code + message now reach the agent (httpx hid the body, e.g. "400 Bad Request"
+  became "Graph 400 20134: ... not a valid updateable element").
 - `tests/test_graph_crud.py`: 18 mocked-Graph tests (no live OneNote needed).
 
 ### Fixed
@@ -26,8 +29,12 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 - Docstrings for `onenote_get_notebook`, `onenote_list_pages`, `show_notebooks_card` and
   all new tools carry When to use / When NOT to use / Behavior sections.
 
-### Not added (Graph v1.0 has no endpoint)
-- Deleting or renaming a notebook, section or section group.
+### Not added
+- Deleting or renaming a notebook, section or section group: Graph v1.0 has no endpoint.
+- Deleting one page element: Graph rejects the `delete` patch action (20122); replace with an
+  empty paragraph instead.
+- Section copy (`copyToNotebook`): returns 501 on personal Microsoft accounts (live-tested,
+  same and different notebook), so it could not be verified and is not shipped.
 
 ## [1.0.4] - 2026-09-26
 
