@@ -31,7 +31,7 @@ from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("onenote_mcp")
-_SERVER_VERSION = "1.0.4"
+_SERVER_VERSION = "1.1.0"
 _START_TIME = time.monotonic()
 
 # Fire-and-forget shutdown tasks (stored to satisfy RUF006)
@@ -215,23 +215,13 @@ async def get_notebook(notebook_id: str) -> Notebook:
 
 async def list_sections(notebook_id: str) -> list[Section]:
     """List all sections in a notebook."""
-    client = await get_graph_client()
-    response = await client.get(f"/me/onenote/notebooks/{notebook_id}/sections")
-    response.raise_for_status()
-
-    data = response.json()
-    return [Section(**section) for section in data.get("value", [])]
+    return [Section(**section) for section in await _get_all(f"/me/onenote/notebooks/{notebook_id}/sections")]
 
 
 async def list_pages(section_id: str) -> list[Page]:
-    """List all pages in a section."""
-    client = await get_graph_client()
-    response = await client.get(f"/me/onenote/sections/{section_id}/pages")
-    response.raise_for_status()
-
-    data = response.json()
+    """List all pages in a section (follows @odata.nextLink; Graph returns ~20 per response)."""
     pages = []
-    for page_data in data.get("value", []):
+    for page_data in await _get_all(f"/me/onenote/sections/{section_id}/pages"):
         # Extract title from content or use ID as fallback
         title = page_data.get("title", f"Page {page_data['id'][:8]}")
         pages.append(Page(**{**page_data, "title": title}))
@@ -284,26 +274,156 @@ async def append_page_content(page_id: str, text: str) -> None:
     response.raise_for_status()
 
 
-async def create_page(notebook_id: str, title: str, content: str) -> dict[str, Any]:
-    """Create a new page with HTML content."""
+# Graph naming rules (learn.microsoft.com/graph/api/onenote-post-notebooks, notebook-post-sections)
+_NOTEBOOK_NAME_MAX = 128
+_NOTEBOOK_NAME_FORBIDDEN = "?*\\/:<>|'\""
+_SECTION_NAME_MAX = 50
+_SECTION_NAME_FORBIDDEN = "?*\\/:<>|&#'%~"
+_LIST_ITEM_CAP = 1000  # safety bound when following @odata.nextLink
+
+
+def validate_name(name: str, kind: str, max_len: int, forbidden: str) -> str:
+    """Return the stripped name or raise ValueError with the exact Graph rule broken."""
+    clean = (name or "").strip()
+    if not clean:
+        raise ValueError(f"{kind} name must not be empty")
+    if len(clean) > max_len:
+        raise ValueError(f"{kind} name is {len(clean)} chars; Graph allows at most {max_len}")
+    bad = sorted({ch for ch in clean if ch in forbidden})
+    if bad:
+        raise ValueError(f"{kind} name contains characters Graph rejects: {' '.join(bad)}")
+    return clean
+
+
+async def _get_all(path: str, cap: int = _LIST_ITEM_CAP) -> list[dict[str, Any]]:
+    """GET a Graph collection, following @odata.nextLink until exhausted or `cap` items."""
     client = await get_graph_client()
+    items: list[dict[str, Any]] = []
+    url: str | None = path
+    while url and len(items) < cap:
+        response = await client.get(url)
+        response.raise_for_status()
+        data = response.json()
+        items.extend(data.get("value", []))
+        url = data.get("@odata.nextLink")
+    return items[:cap]
 
-    # Basic HTML structure
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>{title}</title>
-    </head>
-    <body>
-        <h1>{title}</h1>
-        {content}
-    </body>
-    </html>
+
+async def create_notebook(name: str) -> Notebook:
+    """Create a notebook (Graph requires a unique name, max 128 chars)."""
+    clean = validate_name(name, "Notebook", _NOTEBOOK_NAME_MAX, _NOTEBOOK_NAME_FORBIDDEN)
+    client = await get_graph_client()
+    response = await client.post("/me/onenote/notebooks", json={"displayName": clean})
+    response.raise_for_status()
+    return Notebook(**response.json())
+
+
+async def create_section(notebook_id: str, name: str) -> Section:
+    """Create a section at the top level of a notebook."""
+    clean = validate_name(name, "Section", _SECTION_NAME_MAX, _SECTION_NAME_FORBIDDEN)
+    client = await get_graph_client()
+    response = await client.post(f"/me/onenote/notebooks/{notebook_id}/sections", json={"displayName": clean})
+    response.raise_for_status()
+    return Section(**response.json())
+
+
+async def create_section_group(notebook_id: str, name: str) -> dict[str, Any]:
+    """Create a section group at the top level of a notebook."""
+    clean = validate_name(name, "Section group", _SECTION_NAME_MAX, _SECTION_NAME_FORBIDDEN)
+    client = await get_graph_client()
+    response = await client.post(f"/me/onenote/notebooks/{notebook_id}/sectionGroups", json={"displayName": clean})
+    response.raise_for_status()
+    return response.json()
+
+
+async def list_section_groups(notebook_id: str) -> list[dict[str, Any]]:
+    """List the section groups directly under a notebook."""
+    return await _get_all(f"/me/onenote/notebooks/{notebook_id}/sectionGroups")
+
+
+async def delete_page(page_id: str) -> None:
+    """Delete a page (Graph returns 204; there is no recycle-bin API)."""
+    client = await get_graph_client()
+    response = await client.delete(f"/me/onenote/pages/{page_id}")
+    response.raise_for_status()
+
+
+_PATCH_ACTIONS = {"append", "insert", "prepend", "replace", "delete"}
+_PATCH_POSITIONS = {"before", "after"}
+
+
+def build_patch_command(target: str, action: str, content: str, position: str | None) -> dict[str, str]:
+    """Validate and build one Graph patchContentCommand."""
+    if action not in _PATCH_ACTIONS:
+        raise ValueError(f"action must be one of {sorted(_PATCH_ACTIONS)}, got {action!r}")
+    if not target.strip():
+        raise ValueError("target must be 'body', 'title', '#<data-id>' or '<generated-id>'")
+    if action != "delete" and not content.strip():
+        raise ValueError(f"content is required for action {action!r}")
+    command = {"target": target.strip(), "action": action}
+    if action != "delete":
+        command["content"] = content
+    if position:
+        if position not in _PATCH_POSITIONS:
+            raise ValueError(f"position must be one of {sorted(_PATCH_POSITIONS)}, got {position!r}")
+        command["position"] = position
+    return command
+
+
+async def update_page_content(page_id: str, command: dict[str, str]) -> None:
+    """Apply one patchContentCommand to a page (Graph returns 204)."""
+    client = await get_graph_client()
+    response = await client.patch(f"/me/onenote/pages/{page_id}/content", json=[command])
+    response.raise_for_status()
+
+
+async def copy_section(section_id: str, destination_notebook_id: str, rename_as: str | None) -> str:
+    """Start an async section copy; returns the Operation-Location URL to poll."""
+    body: dict[str, str] = {"id": destination_notebook_id}
+    if rename_as:
+        body["renameAs"] = validate_name(rename_as, "Section", _SECTION_NAME_MAX, _SECTION_NAME_FORBIDDEN)
+    client = await get_graph_client()
+    response = await client.post(f"/me/onenote/sections/{section_id}/copyToNotebook", json=body)
+    response.raise_for_status()
+    return response.headers.get("Operation-Location", "")
+
+
+async def copy_status(operation_url: str) -> dict[str, Any]:
+    """Poll a copy operation (Graph: notStarted | running | completed | failed)."""
+    if not operation_url.startswith("https://graph.microsoft.com/"):
+        raise ValueError("operation_url must be the Operation-Location returned by onenote_copy_section")
+    client = await get_graph_client()
+    response = await client.get(operation_url)
+    response.raise_for_status()
+    return response.json()
+
+
+async def default_section_id(notebook_id: str) -> str:
+    """Resolve the section new pages go to: the notebook's default section, else its first."""
+    sections = await _get_all(f"/me/onenote/notebooks/{notebook_id}/sections")
+    if not sections:
+        raise ValueError("notebook has no sections - create one with onenote_create_section first")
+    chosen = next((s for s in sections if s.get("isDefault")), sections[0])
+    return chosen["id"]
+
+
+async def create_page(notebook_id: str, title: str, content: str, section_id: str | None = None) -> dict[str, Any]:
+    """Create a page in `section_id`, or the notebook's default section.
+
+    Graph only exposes POST .../sections/{id}/pages (and POST /pages for the user's
+    default notebook); there is no .../notebooks/{id}/pages, so the section is resolved first.
     """
+    import html as _html
 
+    client = await get_graph_client()
+    target_section = section_id or await default_section_id(notebook_id)
+    safe_title = _html.escape(title)
+    html_content = (
+        f"<!DOCTYPE html><html><head><title>{safe_title}</title></head>"
+        f"<body><h1>{safe_title}</h1>{content}</body></html>"
+    )
     response = await client.post(
-        f"/me/onenote/notebooks/{notebook_id}/pages",
+        f"/me/onenote/sections/{target_section}/pages",
         content=html_content,
         headers={"Content-Type": "text/html"},
     )
@@ -435,11 +555,19 @@ async def get_notebook_toc(notebook_id: str) -> tuple[TOCData, list[str]]:
 
 
 # Create FastMCP app
-app = FastMCP(name="onenote-mcp", instructions="Microsoft OneNote integration via Model Context Protocol")
+app = FastMCP(
+    name="onenote-mcp",
+    instructions="Microsoft OneNote integration via Model Context Protocol",
+    version=_SERVER_VERSION,
+)
 
-# Tool annotations (TOOL_DESIGN_STANDARDS.md §9 - dict format, FastMCP 3.x)
-_READONLY = {"readonly": True}
-_MUTATING = {}
+# Tool annotations: real MCP hint keys. The fleet-standard `{"readonly": True}` is not an MCP
+# hint, so clients and Glama saw readOnlyHint=None on every tool. openWorldHint = talks to Graph.
+_READONLY = {"readOnlyHint": True, "openWorldHint": True}
+_LOCAL_READONLY = {"readOnlyHint": True, "openWorldHint": False}
+_MUTATING = {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True}
+_LOCAL_WRITE = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+_DESTRUCTIVE = {"readOnlyHint": False, "destructiveHint": True, "openWorldHint": True}
 
 
 @app.custom_route("/health", methods=["GET"])
@@ -1242,7 +1370,7 @@ async def authenticate() -> str:
         return f"❌ Authentication failed: {e!s}"
 
 
-@app.tool(annotations=_MUTATING)
+@app.tool(annotations=_LOCAL_WRITE)
 async def onenote_save_access_token(
     token: Annotated[str, Field(description="The Microsoft Graph access token to save")],
 ) -> str:
@@ -1288,7 +1416,7 @@ async def onenote_list_notebooks() -> str:
         return f"❌ Failed to list notebooks: {e!s}"
 
 
-@app.tool(annotations=_READONLY)
+@app.tool(annotations=_MUTATING)
 async def onenote_export(
     notebook_id: Annotated[str, Field(description="Notebook ID, or empty for all notebooks")] = "",
 ) -> str:
@@ -1309,7 +1437,7 @@ async def onenote_export(
     return "Export started in the background - check onenote_export_status for progress."
 
 
-@app.tool(annotations=_READONLY)
+@app.tool(annotations=_LOCAL_READONLY)
 async def onenote_export_status() -> str:
     """Show Markdown backup progress (files written, output dir).
 
@@ -1483,17 +1611,36 @@ async def onenote_create_page(
     notebook_id: Annotated[str, Field(description="The ID of the notebook to create the page in")],
     title: Annotated[str, Field(description="The title of the new page")],
     content: Annotated[str, Field(description="Optional HTML content for the page")] = "",
+    section_id: Annotated[
+        str | None,
+        Field(description="Section to create the page in. Default: the notebook's default section, else its first"),
+    ] = None,
 ) -> str:
-    """Create a new page in a OneNote notebook.
+    """Create a new page in a OneNote notebook (in a chosen section, or its default section).
+
+    ## When to use
+    - You need a new page; pass section_id (from onenote_list_sections) to control where it goes.
+
+    ## When NOT to use
+    - To add text to an existing page: use onenote_append_page or onenote_update_page.
+    - To create a section: use onenote_create_section first, then pass its ID here.
+
+    ## Behavior
+    - Writes to OneNote via Microsoft Graph (POST .../sections/{id}/pages); not idempotent,
+      so a retry creates a duplicate page.
+    - The title is HTML-escaped; `content` is inserted as raw HTML, so escape any untrusted text.
+    - A notebook with no sections fails with a message telling you to create one.
+    - Errors come back as a string starting with "❌ Failed to create page:" (no raise).
 
     ## Return Format
     Confirmation string: "✅ Page '<title>' created successfully with ID: `<id>`".
 
     ## Examples
-    onenote_create_page(notebook_id="0-ABC123...", title="Meeting Notes", content="<h1>Notes</h1><p>...</p>")
+    onenote_create_page(notebook_id="0-ABC123...", title="Meeting Notes", content="<p>Agenda</p>")
+    onenote_create_page(notebook_id="0-ABC123...", title="Idea", section_id="0-SEC123...")
     """
     try:
-        result = await create_page(notebook_id, title, content)
+        result = await create_page(notebook_id, title, content, section_id)
         page_id = result.get("id", "unknown")
         _log.info("mcp", f"onenote_create_page '{title}' -> {page_id}")
         return f"✅ Page '{title}' created successfully with ID: `{page_id}`"
@@ -1522,6 +1669,305 @@ async def onenote_append_page(
         return f"✅ Appended to page `{page_id}`"
     except Exception as e:
         return f"❌ Failed to append: {e!s}"
+
+
+@app.tool(annotations=_MUTATING)
+async def onenote_create_notebook(
+    name: Annotated[str, Field(description="Notebook name: unique, at most 128 chars, none of ? * \\ / : < > | ' \"")],
+) -> str:
+    """Create a new OneNote notebook.
+
+    ## When to use
+    - The user asks for a brand-new notebook (a new project, class, or archive).
+
+    ## When NOT to use
+    - To add content to an existing notebook: use onenote_create_section or onenote_create_page.
+    - To check whether one exists first: use onenote_list_notebooks.
+
+    ## Behavior
+    - Writes to OneNote via Microsoft Graph (POST /me/onenote/notebooks); not idempotent.
+    - Graph has NO API to rename or delete a notebook afterwards - the user must do that in
+      OneNote. Check onenote_list_notebooks first to avoid litter.
+    - The name is validated locally against Graph's rules before any request is sent.
+    - Errors (duplicate name, bad characters, expired auth) return "❌ Failed to create notebook: ...".
+
+    ## Return Format
+    Confirmation string: "✅ Notebook '<name>' created with ID: `<id>`".
+
+    ## Examples
+    onenote_create_notebook(name="Thesis 2026")
+    """
+    try:
+        notebook = await create_notebook(name)
+        _log.info("mcp", f"onenote_create_notebook '{notebook.displayName}' -> {notebook.id}")
+        return f"✅ Notebook '{notebook.displayName}' created with ID: `{notebook.id}`"
+    except Exception as e:
+        return f"❌ Failed to create notebook: {e!s}"
+
+
+@app.tool(annotations=_MUTATING)
+async def onenote_create_section(
+    notebook_id: Annotated[str, Field(description="The ID of the notebook to add the section to")],
+    name: Annotated[
+        str,
+        Field(description="Section name: unique in the notebook, at most 50 chars, none of ? * \\ / : < > | & # ' % ~"),
+    ],
+) -> str:
+    """Create a new section at the top level of a notebook.
+
+    ## When to use
+    - You need a new section (tab) to hold pages, before calling onenote_create_page.
+
+    ## When NOT to use
+    - To nest sections inside a section group: Graph requires the group's own endpoint,
+      which this server does not expose yet.
+    - To create a notebook: use onenote_create_notebook.
+
+    ## Behavior
+    - Writes to OneNote via Microsoft Graph (POST .../notebooks/{id}/sections); not idempotent.
+    - Graph has NO API to rename or delete a section afterwards - the user must do that in OneNote.
+    - The name is validated locally against Graph's rules before any request is sent.
+    - Errors (duplicate name, unknown notebook, expired auth) return "❌ Failed to create section: ...".
+
+    ## Return Format
+    Confirmation string: "✅ Section '<name>' created with ID: `<id>`".
+
+    ## Examples
+    onenote_create_section(notebook_id="0-ABC123...", name="Meeting Notes")
+    """
+    try:
+        section = await create_section(notebook_id, name)
+        _log.info("mcp", f"onenote_create_section '{section.displayName}' -> {section.id}")
+        return f"✅ Section '{section.displayName}' created with ID: `{section.id}`"
+    except Exception as e:
+        return f"❌ Failed to create section: {e!s}"
+
+
+@app.tool(annotations=_MUTATING)
+async def onenote_create_section_group(
+    notebook_id: Annotated[str, Field(description="The ID of the notebook to add the section group to")],
+    name: Annotated[
+        str,
+        Field(
+            description="Section group name: unique at that level, at most 50 chars, none of ? * \\ / : < > | & # ' % ~"
+        ),
+    ],
+) -> str:
+    """Create a new section group (a folder for sections) at the top level of a notebook.
+
+    ## When to use
+    - You want to organize many sections under a folder-like group.
+
+    ## When NOT to use
+    - To create a plain section: use onenote_create_section.
+    - To see existing groups first: use onenote_list_section_groups.
+
+    ## Behavior
+    - Writes to OneNote via Microsoft Graph (POST .../notebooks/{id}/sectionGroups); not idempotent.
+    - Graph has NO API to rename or delete a section group afterwards.
+    - Errors return "❌ Failed to create section group: ..." (no raise).
+
+    ## Return Format
+    Confirmation string: "✅ Section group '<name>' created with ID: `<id>`".
+
+    ## Examples
+    onenote_create_section_group(notebook_id="0-ABC123...", name="Archive")
+    """
+    try:
+        group = await create_section_group(notebook_id, name)
+        _log.info("mcp", f"onenote_create_section_group '{group.get('displayName')}' -> {group.get('id')}")
+        return f"✅ Section group '{group.get('displayName', name)}' created with ID: `{group.get('id', 'unknown')}`"
+    except Exception as e:
+        return f"❌ Failed to create section group: {e!s}"
+
+
+@app.tool(annotations=_READONLY)
+async def onenote_list_section_groups(
+    notebook_id: Annotated[str, Field(description="The ID of the notebook")],
+) -> str:
+    """List the section groups directly under a notebook.
+
+    ## When to use
+    - You need to see a notebook's folder structure beyond its top-level sections.
+
+    ## When NOT to use
+    - For a full sections-and-pages overview: use onenote_get_notebook_toc.
+    - For top-level sections only: use onenote_list_sections.
+
+    ## Behavior
+    - Read-only: GET .../notebooks/{id}/sectionGroups, following pagination; nothing is modified.
+    - Only top-level groups are listed; nested groups are not expanded.
+    - Errors return "❌ Failed to list section groups: ..." (no raise).
+
+    ## Return Format
+    Markdown string: numbered groups with ID and sections URL, or "No section groups found".
+
+    ## Examples
+    onenote_list_section_groups(notebook_id="0-ABC123...")
+    """
+    try:
+        groups = await list_section_groups(notebook_id)
+        if not groups:
+            return "No section groups found in this notebook"
+        result = "🗂️ Section groups:\n\n"
+        for i, group in enumerate(groups, 1):
+            result += f"{i}. **{group.get('displayName', '(unnamed)')}**\n"
+            result += f"   ID: `{group.get('id', '')}`\n"
+            result += f"   Sections URL: {group.get('sectionsUrl', '')}\n\n"
+        return result
+    except Exception as e:
+        return f"❌ Failed to list section groups: {e!s}"
+
+
+@app.tool(annotations=_MUTATING)
+async def onenote_update_page(
+    page_id: Annotated[str, Field(description="The ID of the page to modify")],
+    target: Annotated[
+        str,
+        Field(description="Where to apply the change: 'body', 'title', '#<data-id>' or a Graph-generated element ID"),
+    ],
+    action: Annotated[str, Field(description="One of: append, prepend, insert, replace, delete")],
+    content: Annotated[str, Field(description="HTML to apply. Required for every action except delete")] = "",
+    position: Annotated[str | None, Field(description="'before' or 'after'; only meaningful for action=insert")] = None,
+) -> str:
+    """Edit part of an existing page by element (replace a paragraph, insert, delete, retitle).
+
+    ## When to use
+    - You must change or remove specific content, or rename the page title (target='title').
+    - Use onenote_get_page first to find element IDs (data-id / id attributes).
+
+    ## When NOT to use
+    - To simply add text at the end: use onenote_append_page (simpler, takes plain text).
+    - To create a page: use onenote_create_page.
+
+    ## Behavior
+    - Writes to OneNote via Microsoft Graph (PATCH .../pages/{id}/content) with one command.
+    - action=replace overwrites the target and action=delete removes it; there is no undo
+      through the API, so re-read the page after important edits.
+    - Fails if the target ID does not exist on the page.
+    - Arguments are validated locally; errors return "❌ Failed to update page: ..." (no raise).
+
+    ## Return Format
+    Confirmation string: "✅ Page `<id>` updated (<action> on <target>)".
+
+    ## Examples
+    onenote_update_page(page_id="0-PG123...", target="title", action="replace", content="New title")
+    onenote_update_page(page_id="0-PG123...", target="#p:{abc}", action="delete")
+    onenote_update_page(page_id="0-PG123...", target="body", action="append", content="<p>Done</p>")
+    """
+    try:
+        command = build_patch_command(target, action, content, position)
+        await update_page_content(page_id, command)
+        _log.info("mcp", f"onenote_update_page {action} {target} -> {page_id}")
+        return f"✅ Page `{page_id}` updated ({action} on {target})"
+    except Exception as e:
+        return f"❌ Failed to update page: {e!s}"
+
+
+@app.tool(annotations=_DESTRUCTIVE)
+async def onenote_delete_page(
+    page_id: Annotated[str, Field(description="The ID of the page to delete")],
+) -> str:
+    """Permanently delete one OneNote page.
+
+    ## When to use
+    - The user explicitly asked to remove this specific page.
+
+    ## When NOT to use
+    - To remove only some content from a page: use onenote_update_page with action=delete.
+    - To clear a notebook or section: Graph cannot delete those, and this tool never tries.
+    - If unsure: read the page with onenote_get_page and confirm with the user first.
+
+    ## Behavior
+    - Destructive: DELETE /me/onenote/pages/{id}. The Graph API offers no undo or restore;
+      treat the deletion as permanent.
+    - Deleting an unknown or already-deleted page returns an error rather than success.
+    - Errors return "❌ Failed to delete page: ..." (no raise).
+
+    ## Return Format
+    Confirmation string: "✅ Page `<id>` deleted".
+
+    ## Examples
+    onenote_delete_page(page_id="0-PG123...")
+    """
+    try:
+        await delete_page(page_id)
+        _log.info("mcp", f"onenote_delete_page -> {page_id}")
+        return f"✅ Page `{page_id}` deleted"
+    except Exception as e:
+        return f"❌ Failed to delete page: {e!s}"
+
+
+@app.tool(annotations=_MUTATING)
+async def onenote_copy_section(
+    section_id: Annotated[str, Field(description="The ID of the section to copy")],
+    destination_notebook_id: Annotated[str, Field(description="The ID of the notebook to copy the section into")],
+    rename_as: Annotated[
+        str | None, Field(description="Name for the copy (<=50 chars). Default: the original section's name")
+    ] = None,
+) -> str:
+    """Copy a section, with its pages, into another (or the same) notebook.
+
+    ## When to use
+    - Duplicating or archiving a section into another notebook.
+
+    ## When NOT to use
+    - To move content (this copies; the original stays - Graph cannot delete sections).
+    - To copy a single page: not supported by this server.
+
+    ## Behavior
+    - Writes to OneNote via Microsoft Graph (POST .../sections/{id}/copyToNotebook); not idempotent.
+    - Asynchronous: Graph answers 202 and the copy finishes later. This tool returns the
+      operation URL; pass it to onenote_copy_status to follow progress.
+    - Errors return "❌ Failed to copy section: ..." (no raise).
+
+    ## Return Format
+    String: "✅ Copy started. Operation: <url>" (poll with onenote_copy_status).
+
+    ## Examples
+    onenote_copy_section(section_id="0-SEC123...", destination_notebook_id="0-NB456...", rename_as="Archive 2026")
+    """
+    try:
+        operation = await copy_section(section_id, destination_notebook_id, rename_as)
+        _log.info("mcp", f"onenote_copy_section {section_id} -> {destination_notebook_id}")
+        return f"✅ Copy started. Operation: {operation or '(none returned)'}"
+    except Exception as e:
+        return f"❌ Failed to copy section: {e!s}"
+
+
+@app.tool(annotations=_READONLY)
+async def onenote_copy_status(
+    operation_url: Annotated[str, Field(description="The Operation URL returned by onenote_copy_section")],
+) -> str:
+    """Check progress of a section copy started with onenote_copy_section.
+
+    ## When to use
+    - After onenote_copy_section, to see whether the copy finished or failed.
+
+    ## When NOT to use
+    - For any other kind of status (export or index): use onenote_export_status or onenote_index_status.
+
+    ## Behavior
+    - Read-only: one GET of the operation URL; only graph.microsoft.com URLs are accepted.
+    - Status values come from Graph: notStarted, running, completed, failed.
+    - Errors return "❌ Failed to read copy status: ..." (no raise).
+
+    ## Return Format
+    String: "Copy status: <status>" plus the resulting section ID when completed, or the error text.
+
+    ## Examples
+    onenote_copy_status(operation_url="https://graph.microsoft.com/v1.0/me/onenote/operations/copy-...")
+    """
+    try:
+        data = await copy_status(operation_url)
+        out = f"Copy status: {data.get('status', 'unknown')}"
+        if data.get("resourceId"):
+            out += f" - new section ID: `{data['resourceId']}`"
+        if data.get("error"):
+            out += f" - error: {data['error']}"
+        return out
+    except Exception as e:
+        return f"❌ Failed to read copy status: {e!s}"
 
 
 @app.tool(annotations=_READONLY)
@@ -1601,7 +2047,7 @@ async def onenote_recent(
         return f"❌ Recent failed: {e!s}"
 
 
-@app.tool(annotations=_READONLY)
+@app.tool(annotations=_MUTATING)
 async def onenote_index_start() -> str:
     """Build (or refresh) the local full-text search index.
 
@@ -1619,7 +2065,7 @@ async def onenote_index_start() -> str:
     return "Index build started in the background - check onenote_index_status for progress."
 
 
-@app.tool(annotations=_READONLY)
+@app.tool(annotations=_LOCAL_READONLY)
 async def onenote_index_status() -> str:
     """Show full-text index build progress and coverage.
 
@@ -1673,7 +2119,7 @@ async def onenote_get_notebook_toc(notebook_id: Annotated[str, Field(description
         return f"❌ Failed to generate TOC: {e!s}"
 
 
-@app.tool(annotations={"destructive": True})
+@app.tool(annotations={"readOnlyHint": False, "destructiveHint": True, "openWorldHint": False})
 async def shutdown_server() -> str:
     """Shut down the onenote-mcp server gracefully.
 
@@ -1695,7 +2141,7 @@ async def shutdown_server() -> str:
     return "✅ Server shutting down..."
 
 
-@app.tool(annotations=_READONLY)
+@app.tool(annotations=_LOCAL_READONLY)
 async def onenote_help() -> str:
     """List the available OneNote MCP tools and when to use each.
 
@@ -1713,8 +2159,16 @@ async def onenote_help() -> str:
 - `onenote_list_sections` - sections of a notebook
 - `onenote_list_pages` - pages of a section
 - `onenote_get_page` - full HTML content of a page
-- `onenote_create_page` - add a page with HTML body
+- `onenote_create_page` - add a page with HTML body (optional section_id)
 - `onenote_append_page` - append plain text to a page
+- `onenote_update_page` - replace/insert/delete one element or retitle a page
+- `onenote_delete_page` - permanently delete a page
+- `onenote_create_notebook` - create a notebook (Graph cannot rename/delete it later)
+- `onenote_create_section` - create a section in a notebook
+- `onenote_create_section_group` - create a section group in a notebook
+- `onenote_list_section_groups` - section groups of a notebook
+- `onenote_copy_section` - copy a section into a notebook (async)
+- `onenote_copy_status` - progress of a section copy
 - `onenote_search_pages` - title or full-text search across notebooks
 - `onenote_index_start` - build the full-text index (background)
 - `onenote_index_status` - index progress and coverage
