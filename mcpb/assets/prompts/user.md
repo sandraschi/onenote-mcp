@@ -784,7 +784,35 @@ Scenario: you are managing a kitchen renovation and want every detail in OneNote
 
 ---
 
-## 30. Putting It All Together
+## 30. Walkthrough: Creating, Editing and Sharing (version 1.1)
+
+### Start a new project notebook
+Say: "Create a notebook called Thesis 2026, add sections Literature and Drafts, and a group
+called Archive." The assistant creates the notebook, then each section, then the group. Tip: ask
+it to check that the name is unused first. Microsoft Graph cannot rename or delete notebooks,
+sections or groups, so a typo has to be fixed by hand in OneNote.
+
+### Write in Markdown
+Say: "Create a page called Team sync in Drafts with an agenda and my action items as a
+checklist." Checklist items become real OneNote to-do items you can tick in the app. Ask
+"read that page as Markdown" to get clean text back. Bold, italics, lists, tables and code
+blocks round-trip; block quotes become ordinary paragraphs in OneNote.
+
+### Fix one paragraph
+Say: "Show me the page with element IDs, then replace the second paragraph with the corrected
+sentence." The assistant reads the page with IDs and edits only that element. To remove a
+paragraph it replaces it with an empty one, because Graph cannot delete elements. To rename a
+page, ask it to change the title.
+
+### Share a link
+Say: "Give me a link to open this page." You get a web link and a desktop-app link for pages and
+notebooks.
+
+### Safety
+Deleting a page is permanent. The assistant should confirm before using it, and prefer blanking
+or appending when you only want to change part of a page.
+
+## 31. Putting It All Together
 
 By now you have seen the full vocabulary of the server:
 

@@ -480,6 +480,40 @@ piece with outline, drafts (multiple `<h2>` versions), and a final page. OneNote
 cross-device sync makes it a good drafting surface; the assistant can later convert the
 final HTML to the target format.
 
+## Creating, Editing and Sharing (version 1.1)
+
+Version 1.1 adds structure creation, element-level editing, Markdown, and links.
+
+**Creating structure.** `onenote_create_notebook`, `onenote_create_section` and
+`onenote_create_section_group` create containers. Names are validated before any request:
+notebook names are at most 128 characters and may not contain `? * \ / : < > | ' "`; section
+and section-group names are at most 50 characters and may not contain `? * \ / : < > | & # ' % ~`.
+Microsoft Graph has no endpoint to rename or delete a notebook, section or section group, so
+creation is effectively permanent. Check `onenote_list_notebooks` or `onenote_list_sections`
+first and never create speculatively. `onenote_list_section_groups` shows a notebook's groups.
+
+**Pages.** `onenote_create_page` accepts an optional `section_id`; without one the page goes to
+the notebook's default section (or its first). `onenote_append_page` adds to the end of a page.
+`onenote_update_page` edits one element: actions are `replace`, `insert` (with `position`
+`before` or `after`), `prepend` and `append`; the target is `body`, `title`, or an element ID.
+Get element IDs with `onenote_get_page(include_ids=true)`. Graph cannot delete a single
+element, so blank one by replacing it with `<p></p>`. `onenote_delete_page` removes a whole page
+permanently with no undo; confirm with the user first.
+
+**Markdown.** `onenote_create_page`, `onenote_append_page` and `onenote_update_page` accept
+`content_format="markdown"`, and `onenote_get_page` accepts `output_format="markdown"`. Raw
+HTML inside Markdown input is escaped. `- [ ]` and `- [x]` items become real OneNote to-do
+items and read back as task items. OneNote restyles on save: block quotes become plain
+paragraphs, so a quote marker does not survive. Markdown output is a reading view; use HTML
+with `include_ids` when you plan to edit by element.
+
+**Links.** `onenote_get_links(kind, item_id)` returns a web link and an `onenote:` desktop-app
+link for a notebook or page. Sections returned no links on a personal account.
+
+**Errors.** Failures come back as text beginning with a cross mark and include Graph's own error
+code and message, for example `20134 ... not a valid updateable element`. Read the message and
+adjust; do not retry blindly.
+
 ## Assistant Behaviors to Prefer
 
 - Prefer search over traversal when the user asks "find" or "where is".
