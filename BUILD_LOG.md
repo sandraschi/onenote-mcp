@@ -1,5 +1,40 @@
 # BUILD_LOG — onenote-mcp
 
+## 2026-10-06 — v1.1.0 NSIS build (PASS after 2 fixes)
+
+Installer: `native/target/release/bundle/nsis/OneNote MCP_1.1.0_x64-setup.exe` (34.16 MiB),
+shipped alongside `dist/onenote-mcp-v1.1.0.mcpb` (82 KB).
+CUA-NSIS smoke: **12/12 phases passed** (health 200 on the dedicated port, version 1.1.0,
+26 tools in diagnostics, WebView bridge OK, uninstall exit 0). Non-fatal: nav "Overview"
+expected text not matched by OCR (template drift, same as 1.0.0) and a "404" string seen on
+the Logging page (the activity log listing earlier 404 lines; `/api/logs` itself exists).
+
+Pre-build audit (TAURI_PRODUCTION_PITFALLS Phase 1, A-J) found and fixed:
+
+1. **Side-by-side rule (A) violated.** The installed app spawned its backend on the dev port
+   10907, so `free_port` could kill the developer's backend. Claimed `onenote-mcp-native`
+   ports 11249/11250 via `fleet-gate/claim_ports.py`; operator backend is now 11250 (Rust
+   `BACKEND_PORT`, CSP, frontend Tauri base URL, smoke config). `run_server.py` only read
+   `ONENOTE_PORT`/`MCP_PORT`, so it now honours `PORT` first (what the shell passes).
+2. **Lifecycle (G).** `main.rs` stopped the backend on `Exit` only and never reaped it; now
+   `Exit` and `ExitRequested`, with `wait()`.
+
+Failure found by the smoke test (Phase 3, "Backend not reachable"):
+
+3. **The installed app killed itself ~7 s after launch (exit -1, no log line).** `free_port`
+   (added 2026-10-02 in a CI commit, never smoke-tested) ran `Stop-Process -Name
+   'onenote-mcp-native'` and `taskkill /IM onenote-mcp-native.exe` - the shell's own process
+   name - before spawning the backend. It also still did the forbidden blind
+   `Get-NetTCPConnection -LocalPort | taskkill` on any PID owning the port (3 places, §15).
+   Fix: image-scoped kill of the backend only, other native instances excluded by PID
+   (`std::process::id()`), blind port-PID kills removed. Diagnosed by capturing stderr (empty),
+   the missing spawn-log lines, and `git log -S` on the offending line.
+
+Other: backend exe verified to contain `markup`, `markdown_it`, `bs4`, `lxml`, `soupsieve`
+(`pyi-archive_viewer`); `/api/v1/health` tool_count was a stale hand-kept 19 (now read from
+FastMCP, 26). Web dist is a single 451 KB chunk (no code-splitting); it rendered fine here, so
+not changed (see pitfalls section 14 #1 if it ever starts exiting -1).
+
 ## 2026-08-01 — v1.0.0 NSIS build (assfix session)
 
 ### Result: PASS (after fixes)

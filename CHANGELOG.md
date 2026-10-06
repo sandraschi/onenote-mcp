@@ -29,6 +29,11 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 - `tests/test_graph_crud.py`: 18 mocked-Graph tests (no live OneNote needed).
 
 ### Fixed
+- Desktop installer: the installed app killed itself ~7 s after launch (`free_port` matched its
+  own process name `onenote-mcp-native`); it also spawned its backend on the dev port 10907.
+  Now image-scoped kills that exclude its own PID, no blind port-PID kills, a dedicated operator
+  port (11250, registered as `onenote-mcp-native`), and the backend is stopped and reaped on
+  `ExitRequested` as well as `Exit`. `run_server.py` honours `PORT`. Smoke test 12/12.
 - `/api/v1/health`, `/api/status`, `/api/capabilities` and `/api/diagnostics` reported a hand-kept
   list of 19 tools while 26 were registered (found by running the packed bundle). They now read
   the tool list from FastMCP; a regression test compares them with `list_tools()`.
