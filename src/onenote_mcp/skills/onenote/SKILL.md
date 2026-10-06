@@ -4,7 +4,7 @@
 
 OneNote MCP connects an AI assistant to Microsoft OneNote through the Microsoft
 Graph API: browsing notebooks/sections/pages, reading full page content (HTML),
-creating and appending pages, and title + full-text search across the user's notes. 25 tools + 1 prompt
+creating and appending pages, and title + full-text search across the user's notes. 26 tools + 1 prompt
 (`onenote_triage`), dual transport (stdio + HTTP streamable on 10907).
 
 ## Tool categories
@@ -15,7 +15,7 @@ creating and appending pages, and title + full-text search across the user's not
 | Discovery | `onenote_list_notebooks`, `onenote_get_notebook`, `onenote_list_sections`, `onenote_list_pages`, `onenote_get_notebook_toc`, `onenote_recent` (what changed) |
 | Structure (create) | `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_list_section_groups`. Graph cannot rename or delete notebooks/sections. |
 | Edit | `onenote_update_page` (element-level replace/insert/prepend/append, retitle; Graph cannot delete elements - blank with replace), `onenote_delete_page` (destructive: confirm with the user first) |
-| Content | `onenote_get_page`, `onenote_create_page` (pass `section_id` to choose the section), `onenote_append_page` (plain text), `onenote_search_pages` (mode `title` or `fulltext`) |
+| Content | `onenote_get_page` (`output_format="markdown"` for readable text; `include_ids=True` for element IDs), `onenote_create_page` (pass `section_id` to choose the section; `content_format="markdown"` for Markdown, `- [ ]` becomes a OneNote to-do), `onenote_append_page` (plain text or Markdown), `onenote_search_pages` (mode `title` or `fulltext`), `onenote_get_links` (web + app link to share a page or notebook) |
 | Backup | `onenote_export`, `onenote_export_status` (Markdown files under data/exports) |
 | Index | `onenote_index_start`, `onenote_index_status` (local FTS5 over page bodies; build once, then full-text works) |
 | Presentation | `show_notebooks_card` (in-chat Prefab card) |

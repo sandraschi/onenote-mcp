@@ -1,6 +1,6 @@
 # Tools
 
-## MCP tools (25) + prompt (`onenote_triage`)
+## MCP tools (26) + prompt (`onenote_triage`)
 
 | Tool | Purpose |
 |------|---------|
@@ -10,11 +10,12 @@
 | `onenote_get_notebook` | Details for one notebook. |
 | `onenote_list_sections` | Sections of a notebook. |
 | `onenote_list_pages` | Pages of a section. |
-| `onenote_get_page` | Full HTML content of a page. |
-| `onenote_create_page` | Create a page (HTML body) in a section (`section_id`) or the notebook's default section. |
-| `onenote_append_page` | Append plain text to a page (paragraphs from blank lines). |
+| `onenote_get_page` | Page content as HTML or Markdown (`output_format`) plus OneNote web/app links; `include_ids` for element IDs. |
+| `onenote_create_page` | Create a page from HTML or Markdown (`content_format`) in a section (`section_id`) or the notebook's default section. |
+| `onenote_append_page` | Append plain text (paragraphs from blank lines) or Markdown to a page. |
 | `onenote_update_page` | Edit one element of a page (replace/insert/prepend/append) or retitle it. |
 | `onenote_delete_page` | Permanently delete a page (DESTRUCTIVE). |
+| `onenote_get_links` | Web and desktop-app links to open a notebook, section or page. |
 | `onenote_create_notebook` | Create a notebook. Graph cannot rename or delete it afterwards. |
 | `onenote_create_section` | Create a section in a notebook. Graph cannot rename or delete it afterwards. |
 | `onenote_create_section_group` | Create a section group in a notebook. |
@@ -35,6 +36,16 @@ read-only tools list/get/search/status; MUTATING (non-destructive writes) are th
 create/append/update tools, `onenote_export`, `onenote_index_start`, `authenticate`
 and `onenote_save_access_token`; DESTRUCTIVE are `onenote_delete_page` and `shutdown_server`.
 Every tool requires a valid Graph token unless it is `authenticate` itself.
+
+**Markdown (verified live 2026-10-06):** `onenote_create_page`, `onenote_append_page` and
+`onenote_update_page` accept `content_format="markdown"`; `onenote_get_page` returns
+`output_format="markdown"`. Raw HTML inside Markdown input is escaped, never passed through.
+`- [ ]` / `- [x]` items become OneNote to-do paragraphs (`data-tag="to-do"`) and read back as
+task items. OneNote restyles on save (bold/italic/code become styled spans, which the reader
+understands; block quotes become plain paragraphs, so the quote marker does not survive).
+Markdown output is a reading view; use HTML plus `include_ids=True` to edit by element.
+`onenote_get_links` returns the web link and the `onenote:` desktop-app link for a notebook or
+page; sections returned no links on a personal account.
 
 **Graph limits (v1.0, verified live on a personal Microsoft account 2026-10-06):** there is no
 endpoint to delete or rename a notebook, section or section group, so this server

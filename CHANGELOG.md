@@ -3,7 +3,20 @@
 ## [1.1.0] - 2026-10-06
 
 Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and weak
-`behavior` / `usage_guidelines` tool-description scores. 19 -> 25 tools.
+`behavior` / `usage_guidelines` tool-description scores. 19 -> 26 tools.
+
+### Added (Markdown + links)
+- Markdown in/out: `content_format="markdown"` on `onenote_create_page`, `onenote_append_page`
+  and `onenote_update_page`; `output_format="markdown"` on `onenote_get_page`. New
+  `markup.py` (markdown-it-py + BeautifulSoup): raw HTML in Markdown input is escaped;
+  `- [ ]` / `- [x]` become OneNote to-do paragraphs and read back as task items; tables, nested
+  and ordered lists, code blocks, links and strikethrough supported. The reader understands
+  OneNote's restyled output (`<span style=...>` for bold/italic/code, consolas code paragraphs,
+  stray U+FFFC), found by a live round trip.
+- `onenote_get_links` (web + `onenote:` desktop links for a notebook or page) and the same
+  links in `onenote_get_page` output. Sections return no links on personal accounts.
+- `markdown-it-py` is now a declared dependency (was only present transitively).
+- `tests/conftest.py` `graph` fixture (shared mocked Graph). Test suite 18 -> 62.
 
 ### Added
 - `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`,
@@ -16,6 +29,7 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 - `tests/test_graph_crud.py`: 18 mocked-Graph tests (no live OneNote needed).
 
 ### Fixed
+- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - `onenote_create_page` posted to `/notebooks/{id}/pages`, which Graph does not document;
   it now creates the page in `section_id` (new optional arg) or the notebook's default
   section. The title is now HTML-escaped.
@@ -99,6 +113,7 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
   disabled + dimmed until signed in.
 
 ### Fixed
+- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - Launcher `UvicornTarget :app` regression (500s) - restored `:http_app`.
 - Cached Graph client surviving re-auth (eternal 401s); MSAL deprecated-API
   crash in callback ("Invalid parameter type"); reserved-scope 500 in
@@ -122,6 +137,7 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 ## [1.0.3] - 2026-09-24 (assfix)
 
 ### Fixed
+- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - Launcher failure: worktree `fleet-start.config.ps1` had regressed
   `UvicornTarget` to the raw FastMCP `server:app` (every route 500'd);
   restored to `server:http_app`, `WebRoot` made relative. Verified
@@ -155,6 +171,7 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 ## [1.0.1] - 2026-08-01 (assfix follow-up)
 
 ### Fixed
+- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - Settings page LLM section called non-existent `/api/llm/providers` and fell back
   to a hardcoded `llama3.2:3b` mock; rewired to the real `/api/llm/discover` with a
   graceful "no local LLM detected" state and no fake model data.
@@ -190,6 +207,7 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
 ## [1.0.0] - 2026-08-01
 
 ### Fixed
+- A page whose title Graph returns as "" (briefly, right after creation) now shows `Page <id>`.
 - ASGI crash (`TypeError: 'FastMCP' object is not callable`): uvicorn target now
   `onenote_mcp.server:http_app` (CORS-wrapped `app.http_app()`), fixed in
   `fleet-start.config.ps1`, `transport.py` (uvicorn.Server instead of `run_http_async`),
