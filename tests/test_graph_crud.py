@@ -31,7 +31,11 @@ def graph(monkeypatch):
             return httpx.Response(404, json={"error": {"message": f"no mock for {request.method} {request.url.path}"}})
         return route(request) if callable(route) else route
 
-    client = httpx.AsyncClient(base_url=GRAPH, transport=httpx.MockTransport(handler))
+    client = httpx.AsyncClient(
+        base_url=GRAPH,
+        transport=httpx.MockTransport(handler),
+        event_hooks={"response": [server._explain_graph_error]},  # same hook as production
+    )
 
     async def fake_client():
         return client
@@ -183,7 +187,8 @@ def test_build_patch_command_validation():
         "action": "append",
         "content": "<p>x</p>",
     }
-    assert server.build_patch_command("#p1", "delete", "ignored", None) == {"target": "#p1", "action": "delete"}
+    with pytest.raises(ValueError, match="cannot delete"):
+        server.build_patch_command("#p1", "delete", "", None)  # live: Graph 400 "$Delete not supported"
     with pytest.raises(ValueError, match="action"):
         server.build_patch_command("body", "explode", "x", None)
     with pytest.raises(ValueError, match="content is required"):
@@ -215,31 +220,39 @@ async def test_delete_page_success_and_not_found(graph):
     assert out.startswith("❌ Failed to delete page")
 
 
-# ---- copy section ------------------------------------------------------------------------------
+# ---- Graph error bodies + element ids ----------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_copy_section_returns_operation_and_polls(graph):
+async def test_graph_error_code_and_message_reach_the_agent(graph):
+    _, routes = graph
+    routes[("PATCH", "/v1.0/me/onenote/pages/pg1/content")] = httpx.Response(
+        400, json={"error": {"code": "20122", "message": "The PATCH action $Delete not supported."}}
+    )
+    out = await server.onenote_update_page(page_id="pg1", target="body", action="append", content="<p>x</p>")
+    assert "20122" in out and "not supported" in out
+
+
+@pytest.mark.asyncio
+async def test_get_page_include_ids_requests_includeids(graph):
     calls, routes = graph
-    op = f"{GRAPH}/me/onenote/operations/copy-1"
-    routes[("POST", "/v1.0/me/onenote/sections/sec1/copyToNotebook")] = httpx.Response(
-        202, headers={"Operation-Location": op}
+    routes[("GET", "/v1.0/me/onenote/pages/pg1")] = httpx.Response(
+        200,
+        json={
+            "id": "pg1",
+            "title": "T",
+            "createdDateTime": "c",
+            "lastModifiedDateTime": "m",
+            "self": "s",
+            "contentUrl": "u",
+        },
     )
-    routes[("GET", "/v1.0/me/onenote/operations/copy-1")] = httpx.Response(
-        200, json={"status": "completed", "resourceId": "newsec"}
-    )
-    out = await server.onenote_copy_section(section_id="sec1", destination_notebook_id="nb2", rename_as="Copy")
-    assert op in out
-    assert _body(calls[0]) == {"id": "nb2", "renameAs": "Copy"}
-    status = await server.onenote_copy_status(operation_url=op)
-    assert "completed" in status and "newsec" in status
-
-
-@pytest.mark.asyncio
-async def test_copy_status_rejects_foreign_url(graph):
-    calls, _ = graph
-    out = await server.onenote_copy_status(operation_url="https://evil.example/steal")
-    assert out.startswith("❌") and calls == []
+    routes[("GET", "/v1.0/me/onenote/pages/pg1/content")] = httpx.Response(200, text='<p id="p:{a}{42}">x</p>')
+    out = await server.onenote_get_page(page_id="pg1", include_ids=True)
+    assert 'id="p:{a}{42}"' in out
+    assert calls[-1].url.params.get("includeIDs") == "true"
+    await server.onenote_get_page(page_id="pg1")
+    assert "includeIDs" not in str(calls[-1].url)
 
 
 def test_version_sources_agree():
@@ -262,8 +275,6 @@ NEW_TOOLS = {
     "onenote_list_section_groups",
     "onenote_update_page",
     "onenote_delete_page",
-    "onenote_copy_section",
-    "onenote_copy_status",
 }
 
 

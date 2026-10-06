@@ -152,6 +152,23 @@ def save_access_token(token: str) -> None:
     logger.info("Access token saved to %s", TOKEN_FILE_PATH)
 
 
+async def _explain_graph_error(response: httpx.Response) -> None:
+    """Raise Graph failures with the service's own code + message (httpx's default hides the body)."""
+    if response.status_code < 400:
+        return
+    await response.aread()
+    try:
+        err = response.json().get("error", {})
+        detail = f"{err.get('code', '')}: {err.get('message', '')}".strip(": ")
+    except ValueError:
+        detail = response.text[:300]
+    raise httpx.HTTPStatusError(
+        f"Graph {response.status_code} {detail or response.reason_phrase}",
+        request=response.request,
+        response=response,
+    )
+
+
 async def get_graph_client() -> httpx.AsyncClient:
     """Get or create Microsoft Graph API client."""
     global _graph_client
@@ -166,6 +183,7 @@ async def get_graph_client() -> httpx.AsyncClient:
         base_url="https://graph.microsoft.com/v1.0",
         headers={"Authorization": f"Bearer {token}"},
         timeout=30.0,
+        event_hooks={"response": [_explain_graph_error]},
     )
     return _graph_client
 
@@ -229,8 +247,12 @@ async def list_pages(section_id: str) -> list[Page]:
     return pages
 
 
-async def get_page(page_id: str) -> Page:
-    """Get complete content of a specific page (metadata + HTML body)."""
+async def get_page(page_id: str, include_ids: bool = False) -> Page:
+    """Get complete content of a specific page (metadata + HTML body).
+
+    include_ids=True asks Graph to stamp every element with its generated id
+    (needed as the `target` of onenote_update_page).
+    """
     client = await get_graph_client()
     response = await client.get(f"/me/onenote/pages/{page_id}")
     response.raise_for_status()
@@ -239,7 +261,11 @@ async def get_page(page_id: str) -> Page:
     # The metadata endpoint has no body - the HTML lives at .../content.
     content = ""
     try:
-        cr = await client.get(f"/me/onenote/pages/{page_id}/content", headers={"Accept": "text/html"})
+        cr = await client.get(
+            f"/me/onenote/pages/{page_id}/content",
+            headers={"Accept": "text/html"},
+            params={"includeIDs": "true"} if include_ids else None,
+        )
         cr.raise_for_status()
         content = cr.text
     except Exception as exc:
@@ -348,21 +374,22 @@ async def delete_page(page_id: str) -> None:
     response.raise_for_status()
 
 
-_PATCH_ACTIONS = {"append", "insert", "prepend", "replace", "delete"}
+# Graph rejects any other action ("20122: The PATCH action $Delete not supported", verified live).
+_PATCH_ACTIONS = {"append", "insert", "prepend", "replace"}
 _PATCH_POSITIONS = {"before", "after"}
 
 
 def build_patch_command(target: str, action: str, content: str, position: str | None) -> dict[str, str]:
     """Validate and build one Graph patchContentCommand."""
     if action not in _PATCH_ACTIONS:
-        raise ValueError(f"action must be one of {sorted(_PATCH_ACTIONS)}, got {action!r}")
+        raise ValueError(
+            f"action must be one of {sorted(_PATCH_ACTIONS)}, got {action!r} (Graph cannot delete elements)"
+        )
     if not target.strip():
         raise ValueError("target must be 'body', 'title', '#<data-id>' or '<generated-id>'")
-    if action != "delete" and not content.strip():
+    if not content.strip():
         raise ValueError(f"content is required for action {action!r}")
-    command = {"target": target.strip(), "action": action}
-    if action != "delete":
-        command["content"] = content
+    command = {"target": target.strip(), "action": action, "content": content}
     if position:
         if position not in _PATCH_POSITIONS:
             raise ValueError(f"position must be one of {sorted(_PATCH_POSITIONS)}, got {position!r}")
@@ -375,27 +402,6 @@ async def update_page_content(page_id: str, command: dict[str, str]) -> None:
     client = await get_graph_client()
     response = await client.patch(f"/me/onenote/pages/{page_id}/content", json=[command])
     response.raise_for_status()
-
-
-async def copy_section(section_id: str, destination_notebook_id: str, rename_as: str | None) -> str:
-    """Start an async section copy; returns the Operation-Location URL to poll."""
-    body: dict[str, str] = {"id": destination_notebook_id}
-    if rename_as:
-        body["renameAs"] = validate_name(rename_as, "Section", _SECTION_NAME_MAX, _SECTION_NAME_FORBIDDEN)
-    client = await get_graph_client()
-    response = await client.post(f"/me/onenote/sections/{section_id}/copyToNotebook", json=body)
-    response.raise_for_status()
-    return response.headers.get("Operation-Location", "")
-
-
-async def copy_status(operation_url: str) -> dict[str, Any]:
-    """Poll a copy operation (Graph: notStarted | running | completed | failed)."""
-    if not operation_url.startswith("https://graph.microsoft.com/"):
-        raise ValueError("operation_url must be the Operation-Location returned by onenote_copy_section")
-    client = await get_graph_client()
-    response = await client.get(operation_url)
-    response.raise_for_status()
-    return response.json()
 
 
 async def default_section_id(notebook_id: str) -> str:
@@ -1565,19 +1571,40 @@ async def onenote_list_pages(section_id: Annotated[str, Field(description="The I
 
 
 @app.tool(annotations=_READONLY)
-async def onenote_get_page(page_id: Annotated[str, Field(description="The ID of the page to retrieve")]) -> str:
+async def onenote_get_page(
+    page_id: Annotated[str, Field(description="The ID of the page to retrieve")],
+    include_ids: Annotated[
+        bool,
+        Field(description="Stamp every element with its Graph id so onenote_update_page can target it"),
+    ] = False,
+) -> str:
     """Get the complete HTML content of a OneNote page.
 
     Retrieves the full page content including text, formatting, and embedded elements.
+
+    ## When to use
+    - You need to read a page, or find element IDs before an element-level onenote_update_page
+      (set include_ids=True).
+
+    ## When NOT to use
+    - To find a page by text: use onenote_search_pages.
+    - To list pages in a section: use onenote_list_pages (cheaper, no bodies).
+
+    ## Behavior
+    - Read-only: GET .../pages/{id} plus GET .../pages/{id}/content; nothing is modified.
+    - Returns raw HTML (not Markdown); include_ids=True adds an id attribute to each element.
+    - If the body fetch fails the page metadata is still returned, marked content not available.
+    - Errors return "❌ Failed to get page content: ..." (no raise).
 
     ## Return Format
     Markdown string: "📄 Page Content:" with title, ID, timestamps, and the raw HTML body.
 
     ## Examples
     onenote_get_page(page_id="0-PG123...")
+    onenote_get_page(page_id="0-PG123...", include_ids=True)
     """
     try:
-        page = await get_page(page_id)
+        page = await get_page(page_id, include_ids)
         if page.content:
             # For now, return the HTML content
             # TODO: Convert HTML to markdown for better readability
@@ -1826,15 +1853,15 @@ async def onenote_update_page(
         str,
         Field(description="Where to apply the change: 'body', 'title', '#<data-id>' or a Graph-generated element ID"),
     ],
-    action: Annotated[str, Field(description="One of: append, prepend, insert, replace, delete")],
-    content: Annotated[str, Field(description="HTML to apply. Required for every action except delete")] = "",
+    action: Annotated[str, Field(description="One of: append, prepend, insert, replace")],
+    content: Annotated[str, Field(description="HTML to apply (required)")],
     position: Annotated[str | None, Field(description="'before' or 'after'; only meaningful for action=insert")] = None,
 ) -> str:
-    """Edit part of an existing page by element (replace a paragraph, insert, delete, retitle).
+    """Edit part of an existing page by element (replace a paragraph, insert, retitle).
 
     ## When to use
-    - You must change or remove specific content, or rename the page title (target='title').
-    - Use onenote_get_page first to find element IDs (data-id / id attributes).
+    - You must change specific content, or rename the page title (target='title').
+    - Call onenote_get_page(include_ids=True) first to get element IDs (the id attributes).
 
     ## When NOT to use
     - To simply add text at the end: use onenote_append_page (simpler, takes plain text).
@@ -1842,8 +1869,10 @@ async def onenote_update_page(
 
     ## Behavior
     - Writes to OneNote via Microsoft Graph (PATCH .../pages/{id}/content) with one command.
-    - action=replace overwrites the target and action=delete removes it; there is no undo
-      through the API, so re-read the page after important edits.
+    - action=replace overwrites the target; there is no undo through the API, so re-read the
+      page after important edits.
+    - Graph cannot delete an element (it rejects the action); to blank one, replace it with
+      an empty paragraph. To remove a whole page use onenote_delete_page.
     - Fails if the target ID does not exist on the page.
     - Arguments are validated locally; errors return "❌ Failed to update page: ..." (no raise).
 
@@ -1852,7 +1881,7 @@ async def onenote_update_page(
 
     ## Examples
     onenote_update_page(page_id="0-PG123...", target="title", action="replace", content="New title")
-    onenote_update_page(page_id="0-PG123...", target="#p:{abc}", action="delete")
+    onenote_update_page(page_id="0-PG123...", target="p:{abc}{42}", action="replace", content="<p>Fixed text</p>")
     onenote_update_page(page_id="0-PG123...", target="body", action="append", content="<p>Done</p>")
     """
     try:
@@ -1874,7 +1903,7 @@ async def onenote_delete_page(
     - The user explicitly asked to remove this specific page.
 
     ## When NOT to use
-    - To remove only some content from a page: use onenote_update_page with action=delete.
+    - To blank part of a page: use onenote_update_page with action=replace (Graph cannot delete elements).
     - To clear a notebook or section: Graph cannot delete those, and this tool never tries.
     - If unsure: read the page with onenote_get_page and confirm with the user first.
 
@@ -1896,78 +1925,6 @@ async def onenote_delete_page(
         return f"✅ Page `{page_id}` deleted"
     except Exception as e:
         return f"❌ Failed to delete page: {e!s}"
-
-
-@app.tool(annotations=_MUTATING)
-async def onenote_copy_section(
-    section_id: Annotated[str, Field(description="The ID of the section to copy")],
-    destination_notebook_id: Annotated[str, Field(description="The ID of the notebook to copy the section into")],
-    rename_as: Annotated[
-        str | None, Field(description="Name for the copy (<=50 chars). Default: the original section's name")
-    ] = None,
-) -> str:
-    """Copy a section, with its pages, into another (or the same) notebook.
-
-    ## When to use
-    - Duplicating or archiving a section into another notebook.
-
-    ## When NOT to use
-    - To move content (this copies; the original stays - Graph cannot delete sections).
-    - To copy a single page: not supported by this server.
-
-    ## Behavior
-    - Writes to OneNote via Microsoft Graph (POST .../sections/{id}/copyToNotebook); not idempotent.
-    - Asynchronous: Graph answers 202 and the copy finishes later. This tool returns the
-      operation URL; pass it to onenote_copy_status to follow progress.
-    - Errors return "❌ Failed to copy section: ..." (no raise).
-
-    ## Return Format
-    String: "✅ Copy started. Operation: <url>" (poll with onenote_copy_status).
-
-    ## Examples
-    onenote_copy_section(section_id="0-SEC123...", destination_notebook_id="0-NB456...", rename_as="Archive 2026")
-    """
-    try:
-        operation = await copy_section(section_id, destination_notebook_id, rename_as)
-        _log.info("mcp", f"onenote_copy_section {section_id} -> {destination_notebook_id}")
-        return f"✅ Copy started. Operation: {operation or '(none returned)'}"
-    except Exception as e:
-        return f"❌ Failed to copy section: {e!s}"
-
-
-@app.tool(annotations=_READONLY)
-async def onenote_copy_status(
-    operation_url: Annotated[str, Field(description="The Operation URL returned by onenote_copy_section")],
-) -> str:
-    """Check progress of a section copy started with onenote_copy_section.
-
-    ## When to use
-    - After onenote_copy_section, to see whether the copy finished or failed.
-
-    ## When NOT to use
-    - For any other kind of status (export or index): use onenote_export_status or onenote_index_status.
-
-    ## Behavior
-    - Read-only: one GET of the operation URL; only graph.microsoft.com URLs are accepted.
-    - Status values come from Graph: notStarted, running, completed, failed.
-    - Errors return "❌ Failed to read copy status: ..." (no raise).
-
-    ## Return Format
-    String: "Copy status: <status>" plus the resulting section ID when completed, or the error text.
-
-    ## Examples
-    onenote_copy_status(operation_url="https://graph.microsoft.com/v1.0/me/onenote/operations/copy-...")
-    """
-    try:
-        data = await copy_status(operation_url)
-        out = f"Copy status: {data.get('status', 'unknown')}"
-        if data.get("resourceId"):
-            out += f" - new section ID: `{data['resourceId']}`"
-        if data.get("error"):
-            out += f" - error: {data['error']}"
-        return out
-    except Exception as e:
-        return f"❌ Failed to read copy status: {e!s}"
 
 
 @app.tool(annotations=_READONLY)
@@ -2161,14 +2118,12 @@ async def onenote_help() -> str:
 - `onenote_get_page` - full HTML content of a page
 - `onenote_create_page` - add a page with HTML body (optional section_id)
 - `onenote_append_page` - append plain text to a page
-- `onenote_update_page` - replace/insert/delete one element or retitle a page
+- `onenote_update_page` - replace/insert/prepend/append on one element, or retitle a page
 - `onenote_delete_page` - permanently delete a page
 - `onenote_create_notebook` - create a notebook (Graph cannot rename/delete it later)
 - `onenote_create_section` - create a section in a notebook
 - `onenote_create_section_group` - create a section group in a notebook
 - `onenote_list_section_groups` - section groups of a notebook
-- `onenote_copy_section` - copy a section into a notebook (async)
-- `onenote_copy_status` - progress of a section copy
 - `onenote_search_pages` - title or full-text search across notebooks
 - `onenote_index_start` - build the full-text index (background)
 - `onenote_index_status` - index progress and coverage
