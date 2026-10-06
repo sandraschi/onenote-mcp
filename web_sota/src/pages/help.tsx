@@ -58,7 +58,8 @@ export function Help() {
             </p>
             <div className="p-3 bg-slate-900 rounded border border-slate-800 font-mono text-xs">
               <p># Ports (registered in WEBAPP_PORTS.md)</p>
-              <p>BACKEND_PORT = 10907</p>
+              <p>BACKEND_PORT = 10907 (dev)</p>
+              <p>NATIVE_BACKEND_PORT = 11250 (installed app)</p>
               <p>FRONTEND_PORT = 10906</p>
             </div>
           </CardContent>

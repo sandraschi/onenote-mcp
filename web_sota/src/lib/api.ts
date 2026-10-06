@@ -2,10 +2,11 @@ const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 // In dev the Vite proxy maps /api -> 127.0.0.1:10907. The built dist served by
-// the Tauri WebView has no proxy, so the API base must be absolute there.
+// the Tauri WebView has no proxy, so the API base must be absolute there, on the
+// installed app's own port (11250, onenote-mcp-native) - never the dev backend port.
 export const API_BASE =
   import.meta.env.VITE_API_BASE ||
-  (isTauri ? "http://127.0.0.1:10907/api" : "/api");
+  (isTauri ? "http://127.0.0.1:11250/api" : "/api");
 
 export async function fetchJson<T = unknown>(
   path: string,

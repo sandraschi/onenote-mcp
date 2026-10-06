@@ -3,7 +3,7 @@
     "install_dir": "%LOCALAPPDATA%\\OneNote MCP",
     "operator_exe": "onenote-mcp-native.exe",
     "backend_process_names": ["onenote-mcp-native", "onenote-mcp-backend"],
-    "backend_port": 10907,
+    "backend_port": 11250,
     "health_path": "/api/v1/health",
     "diagnostics_path": "/api/v1/diagnostics",
     "feature_smoke_path": "/api/status",
