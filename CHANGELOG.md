@@ -10,7 +10,7 @@ Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and w
   `onenote_list_section_groups`, `onenote_update_page` (PATCH one element / retitle),
   `onenote_delete_page`, `onenote_copy_section` + `onenote_copy_status` (async copy).
   Names are validated locally against Graph's documented rules before any request.
-- `tests/test_graph_crud.py`: 24 mocked-Graph tests (no live OneNote needed).
+- `tests/test_graph_crud.py`: 18 mocked-Graph tests (no live OneNote needed).
 
 ### Fixed
 - `onenote_create_page` posted to `/notebooks/{id}/pages`, which Graph does not document;
