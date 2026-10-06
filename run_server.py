@@ -31,6 +31,7 @@ if __name__ == "__main__":
     from onenote_mcp.server import http_app
 
     host = os.environ.get("ONENOTE_HOST", "127.0.0.1")
-    port = int(os.environ.get("ONENOTE_PORT", os.environ.get("MCP_PORT", "10907")))
+    # PORT is what the Tauri shell passes (its dedicated operator port); the others are for dev/CLI.
+    port = int(os.environ.get("PORT") or os.environ.get("ONENOTE_PORT") or os.environ.get("MCP_PORT") or "10907")
     log_level = os.environ.get("ONENOTE_LOG_LEVEL", "info")
     uvicorn.run(http_app, host=host, port=port, log_level=log_level)

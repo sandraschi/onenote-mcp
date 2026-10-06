@@ -13,7 +13,7 @@ pub struct BackendProcess(pub Mutex<Option<Child>>);
 
 // -- PER-REPO: Customize these constants --
 const BACKEND_NAME: &str = "onenote-mcp-backend.exe";
-const BACKEND_PORT: u16 = 10907;
+const BACKEND_PORT: u16 = 11250; // dedicated operator port (onenote-mcp-native in WEBAPP_PORTS.md); dev backend stays 10907
 const BACKEND_TAG: &str = "onenote-mcp-backend-x86_64-pc-windows-msvc.exe";
 const ENV_PORT: &str = "PORT";
 const ENV_HOST: &str = "HOST";
@@ -101,26 +101,20 @@ pub fn materialize_backend(app: &AppHandle) -> Result<PathBuf, String> {
 fn free_port(port: u16) {
     #[cfg(windows)]
     {
-        // Multi-layer kill: Stop-Process (same-user), taskkill (any user),
-        // port release, escalated kill (UAC), TIME_WAIT poll.
+        // Image-scoped kills only (TAURI_PRODUCTION_PITFALLS section 14/15). Never kill whichever
+        // PID happens to own the port (Docker wslrelay, NSSM services), and never kill ourselves:
+        // this shell IS onenote-mcp-native.exe, so a stale-instance kill must exclude our own PID.
+        // (A name-only kill here made the installed app terminate itself ~7s after launch.)
+        let me = std::process::id();
         let img_kill = format!(
             "Stop-Process -Name 'onenote-mcp-backend' -Force -ErrorAction SilentlyContinue; \
-             Stop-Process -Name 'onenote-mcp-native' -Force -ErrorAction SilentlyContinue; \
-             taskkill /F /IM onenote-mcp-backend.exe /T 2>$null; \
-             taskkill /F /IM onenote-mcp-native.exe /T 2>$null"
+             Get-Process -Name 'onenote-mcp-native' -ErrorAction SilentlyContinue \
+             | Where-Object {{ $_.Id -ne {me} }} \
+             | Stop-Process -Force -ErrorAction SilentlyContinue; \
+             taskkill /F /IM onenote-mcp-backend.exe /T 2>$null"
         );
         let _ = Command::new("powershell.exe")
             .args(["-NoProfile", "-Command", &img_kill])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-
-        let port_kill = format!(
-            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue \
-             | ForEach-Object {{ taskkill /F /PID `$_.OwningProcess /T 2>$null }}"
-        );
-        let _ = Command::new("powershell.exe")
-            .args(["-NoProfile", "-Command", &port_kill])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
@@ -146,29 +140,15 @@ fn free_port(port: u16) {
                 return;
             }
             if i == 5 {
-                // Re-kill: first attempt may have missed some processes
+                // Re-run the image-scoped kill: the first pass may have missed a slow-dying child.
                 let _ = Command::new("powershell.exe")
                     .args(["-NoProfile", "-Command", &img_kill])
-                    .status();
-                let _ = Command::new("powershell.exe")
-                    .args(["-NoProfile", "-Command", &port_kill])
-                    .status();
-            }
-            if i == 15 {
-                // Still occupied - elevated kill via UAC (single prompt)
-                let elevated = format!(
-                    "Start-Process powershell -Verb RunAs -WindowStyle Hidden -ArgumentList \
-                     '-NoProfile -Command \"Stop-Process -Name onenote-mcp-backend -Force -ErrorAction SilentlyContinue; \
-                     taskkill /F /IM onenote-mcp-backend.exe /T 2>$null; \
-                     Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | \
-                     ForEach-Object {{ taskkill /F /PID $_.OwningProcess /T 2>$null }}\"'"
-                );
-                let _ = Command::new("powershell.exe")
-                    .args(["-NoProfile", "-Command", &elevated])
                     .status();
             }
             thread::sleep(Duration::from_secs(1));
         }
+        // Still occupied by something that is not ours: leave it alone. The health check in
+        // spawn_backend reports "not reachable" to the UI instead of us killing an unknown PID.
     }
 }
 
@@ -192,7 +172,7 @@ pub fn spawn_backend(app: AppHandle, state: &BackendProcess) -> Result<String, S
 
     log_line(
         &app,
-        &format!("spawning {} (cwd {}) on port 10907",
+        &format!("spawning {} (cwd {}) on port {BACKEND_PORT}",
             backend_path.display(), workdir.display()),
     );
 
@@ -262,7 +242,7 @@ pub fn spawn_backend(app: AppHandle, state: &BackendProcess) -> Result<String, S
         let _ = app_health.emit("backend-status", "error: backend not reachable");
     });
 
-    Ok(format!("Backend starting on port 10907"))
+    Ok(format!("Backend starting on port {BACKEND_PORT}"))
 }
 
 fn watch_backend_stream<R: std::io::Read + Send + 'static>(stream: R, app: AppHandle) {
