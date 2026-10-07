@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import re
 
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, Tag
+from bs4.element import NavigableString, PageElement
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
@@ -115,13 +116,13 @@ def _wrap(inner: str, marker: str) -> str:
 
 
 def _is_mono(node: Tag) -> bool:
-    style = (node.get("style") or "").lower().replace(" ", "")
+    style = str(node.get("style") or "").lower().replace(" ", "")
     return "font-family:consolas" in style or "font-family:courier" in style or "font-family:monospace" in style
 
 
 def _styled(node: Tag, inner: str) -> str:
     """OneNote rewrites <b>/<i>/<s>/<code> into <span style=...>; read the styles back."""
-    style = (node.get("style") or "").lower().replace(" ", "")
+    style = str(node.get("style") or "").lower().replace(" ", "")
     if _is_mono(node):
         code = node.get_text().replace(_OBJ_CHAR, "")
         return f"`{code}`" if code.strip() else ""
@@ -135,9 +136,11 @@ def _styled(node: Tag, inner: str) -> str:
     return inner
 
 
-def _inline(node: Tag | NavigableString) -> str:
+def _inline(node: PageElement) -> str:
     if isinstance(node, NavigableString):
         return _escape(re.sub(r"\s+", " ", str(node).replace(_OBJ_CHAR, "")))
+    if not isinstance(node, Tag):
+        return ""
     inner = "".join(_inline(c) for c in node.children)
     name = node.name
     if name == "span":
@@ -219,7 +222,7 @@ def _blocks(node: Tag) -> list[tuple[str, str]]:
         run.clear()
 
     for child in node.children:
-        if isinstance(child, NavigableString) or child.name not in _BLOCKS:
+        if not isinstance(child, Tag) or child.name not in _BLOCKS:
             run.append(_inline(child))
             continue
         flush()
