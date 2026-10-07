@@ -1,5 +1,6 @@
 import { Activity, Cpu, HardDrive, Network, Shield } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { SetupChecklist } from "@/components/setup-checklist";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API_BASE } from "@/lib/api";
@@ -10,7 +11,7 @@ interface StatusPayload {
   version?: string;
   uptime_seconds?: number;
   tool_count?: number;
-  providers?: { graph?: { authenticated?: boolean } };
+  providers?: { graph?: { configured?: boolean; authenticated?: boolean } };
 }
 
 interface LogStats {
@@ -117,8 +118,9 @@ export function Dashboard() {
           <p className="text-slate-300 max-w-2xl" data-testid="dashboard-hero">
             Your OneNote notebooks, readable by you and your AI assistant.
             Browse and search notes under Notebooks, chat about them under AI
-            Command — agents get the same power through 16 MCP tools. Sign in
-            once with Microsoft; the session renews itself.
+            Command — agents get the same power through{" "}
+            {status?.tool_count ?? "the"} MCP tools. Sign in once with
+            Microsoft; the session renews itself.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -153,6 +155,18 @@ export function Dashboard() {
           )}
         </div>
       </div>
+
+      <SetupChecklist
+        configured={
+          backendOk ? Boolean(status?.providers?.graph?.configured) : undefined
+        }
+        signedIn={
+          backendOk
+            ? Boolean(status?.providers?.graph?.authenticated)
+            : undefined
+        }
+        onChanged={refresh}
+      />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-slate-800 bg-slate-950/50">

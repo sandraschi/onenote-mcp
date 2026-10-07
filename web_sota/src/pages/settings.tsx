@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AiToolsSettings } from "../components/ai-tools-settings";
+import { MsAppRegistration } from "../components/ms-app-registration";
 import { API_BASE, API_ORIGIN } from "../lib/api";
 import { PROVIDER_ORDER, useLlmStore } from "../store/llm";
 
@@ -166,7 +168,27 @@ export function Settings() {
           </CardContent>
         </Card>
 
+        <Card
+          className="border-slate-800 bg-slate-950/50"
+          data-testid="msapp-card"
+        >
+          <CardHeader>
+            <CardTitle className="text-white">
+              Microsoft app registration
+            </CardTitle>
+            <CardDescription className="text-slate-300">
+              Your own free Microsoft app (client ID) lets this app reach your
+              OneNote.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MsAppRegistration showGuide={false} />
+          </CardContent>
+        </Card>
+
         <LLMSettings />
+
+        <AiToolsSettings />
 
         <BackupSettings />
       </div>
