@@ -32,7 +32,7 @@ from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("onenote_mcp")
-_SERVER_VERSION = "1.1.1"
+_SERVER_VERSION = "1.2.0"
 _START_TIME = time.monotonic()
 
 # Fire-and-forget shutdown tasks (stored to satisfy RUF006)
