@@ -26,6 +26,15 @@ if ([string]::IsNullOrWhiteSpace($manifest.name)) { throw "manifest.json has no 
 if ([string]::IsNullOrWhiteSpace($manifest.version)) { throw "manifest.json has no (or empty) top-level 'version' -- would produce a malformed output filename." }
 if (-not $manifest.server) { throw "manifest.json has no 'server' section -- cannot resolve entry_point." }
 
+# Claude Desktop only expands the MCPB-spec variables below. ${PWD} (and any
+# other shell-style variable) is passed through LITERALLY, so the server
+# starts with a bogus path and fails -- invisible until a real install.
+# (onenote-mcp 2026-10-07: the fleet standard itself prescribed ${PWD}.)
+$allowedVars = '^(__dirname|HOME|DESKTOP|DOCUMENTS|DOWNLOADS|pathSeparator|/|user_config\.[A-Za-z0-9_]+)$'
+$badVars = [regex]::Matches((Get-Content $ManifestPath -Raw), '\$\{([^}]*)\}') |
+    ForEach-Object { $_.Groups[1].Value } | Where-Object { $_ -notmatch $allowedVars } | Select-Object -Unique
+if ($badVars) { throw "manifest.json uses variables Claude Desktop does not expand: $($badVars -join ', ') -- use `${__dirname} for the bundle directory." }
+
 if (-not (Get-Command bunx -ErrorAction SilentlyContinue)) {
     throw "bunx not found on PATH -- install Bun (https://bun.sh) before packing; @anthropic-ai/mcpb is invoked via bunx."
 }
@@ -197,6 +206,25 @@ if (Test-Path $OutFile) { Remove-Item -Force $OutFile }
 bunx @anthropic-ai/mcpb pack $McpbDir $OutFile
 if ($LASTEXITCODE -ne 0) { throw 'mcpb pack failed' }
 
+Step 8b 'Release assets: stable unversioned name + install.ps1 (README one-liner uses releases/latest/download/...)'
+$StableFile = Join-Path $OutDir "$($manifest.name).mcpb"
+Copy-Item $OutFile $StableFile -Force
+$InstallerSrc = Join-Path $RepoRoot '..\mcp-central-docs\scripts\install-mcpb.ps1'
+if (-not (Test-Path $InstallerSrc)) { throw "Fleet installer not found: $InstallerSrc" }
+# `irm ... | iex` cannot pass parameters or run a param() block, so the released
+# install.ps1 is the fleet installer with its param block replaced by this repo's
+# own latest-release URL (owner/repo taken from the git remote) and the bundle SHA256.
+$remote = (git -C $RepoRoot remote get-url origin) -replace '\.git$', ''
+if ($remote -notmatch 'github\.com[:/]([^/]+/[^/]+)$') { throw "origin is not a GitHub remote: $remote" }
+$ghRepo = $Matches[1]
+$bundleSha = (Get-FileHash $StableFile -Algorithm SHA256).Hash.ToLower()
+$installer = Get-Content $InstallerSrc -Raw
+$paramBlock = [regex]::Match($installer, '(?s)\[CmdletBinding\(\)\]\s*param\(.*?\r?\n\)\r?\n')
+if (-not $paramBlock.Success) { throw 'install-mcpb.ps1 param block not found -- pack.ps1 and the installer have drifted.' }
+$header = "`$Source = 'https://github.com/$ghRepo/releases/latest/download/$($manifest.name).mcpb'`r`n`$Sha256 = '$bundleSha'`r`n"
+[IO.File]::WriteAllText((Join-Path $OutDir 'install.ps1'), $installer.Replace($paramBlock.Value, $header), (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "  $StableFile + install.ps1 for $ghRepo (attach ALL THREE files to the GitHub release; sha256 $bundleSha)"
+
 Step 9 'Verify pack output'
 if (-not (Test-Path $OutFile)) { throw "Pack did not produce $OutFile" }
 $size = (Get-Item $OutFile).Length
@@ -239,8 +267,19 @@ try {
     $env:MCP_PORT = '39812'
     $outLog = Join-Path $LaunchDir 'launch.out.log'
     $errLog = Join-Path $LaunchDir 'launch.err.log'
+    # A staged package module (src/<pkg>/server.py) cannot be run as a bare
+    # script (relative imports). Launch it the way Claude Desktop does, as
+    # `python -m <pkg>` with only the unpacked bundle's src/ on PYTHONPATH, over
+    # HTTP so a TCP probe can prove it actually serves.
+    $launchArgs = @($launchEntry)
+    $prevPyPath = $env:PYTHONPATH; $prevTransport = $env:MCP_TRANSPORT
+    if (-not $entryRelToSrc.StartsWith('..')) {
+        $launchArgs = @('-m', $Pkg)
+        $env:PYTHONPATH = Join-Path $LaunchDir 'src'
+        $env:MCP_TRANSPORT = 'http'
+    }
     $proc = Start-Process -FilePath $VenvPython `
-        -ArgumentList @($launchEntry) `
+        -ArgumentList $launchArgs `
         -WorkingDirectory $LaunchDir -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput $outLog -RedirectStandardError $errLog
     Start-Sleep -Seconds 4
@@ -258,10 +297,17 @@ try {
     if ($errText -match 'Traceback \(most recent call last\)') {
         throw "Packaged entry point logged a traceback despite staying alive - startup likely failed in a background thread.`n$errText"
     }
+    if (-not $entryRelToSrc.StartsWith('..')) {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        try { $tcp.Connect('127.0.0.1', 39812) } catch { throw "Packaged entry point is alive but not listening on 39812 (http probe failed).`n$errText" } finally { $tcp.Dispose() }
+        Write-Host '  OK: packaged entry point accepted a TCP connection on 39812'
+    }
     Write-Host "  OK: packaged entry point stayed alive 4s from a clean unpacked copy (pid $($proc.Id))"
     Write-Host "  Note: this proves the bundle starts without crashing, not that it actually serves - a stdio-transport server idling on stdin looks identical to one working correctly." -ForegroundColor DarkGray
 } finally {
     if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+    if ($null -eq $prevPyPath) { Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue } else { $env:PYTHONPATH = $prevPyPath }
+    if ($null -eq $prevTransport) { Remove-Item Env:\MCP_TRANSPORT -ErrorAction SilentlyContinue } else { $env:MCP_TRANSPORT = $prevTransport }
     if ($null -eq $prevMcpPort) { Remove-Item Env:\MCP_PORT -ErrorAction SilentlyContinue } else { $env:MCP_PORT = $prevMcpPort }
     Remove-Item -Recurse -Force $LaunchDir -ErrorAction SilentlyContinue
 }

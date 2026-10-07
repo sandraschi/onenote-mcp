@@ -23,3 +23,8 @@ build/
 native/
 web_sota/
 scripts/
+
+# Bundle-root build/dev files (mcpb/ is the pack root)
+pack.ps1
+verify_pack.py
+run_server.py

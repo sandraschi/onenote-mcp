@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.1] - 2026-10-07
+
+Packaging-only release: the v1.1.0 `.mcpb` could not start in Claude Desktop.
+
+### Fixed
+- `.mcpb` manifest used `${PWD}` (not expanded by Claude Desktop) and launched the HTTP
+  sidecar `run_server.py`. It now uses `${__dirname}` and starts `python -m onenote_mcp` over stdio.
+- Bundle no longer ships `pack.ps1`, `verify_pack.py`, `run_server.py`.
+
+### Added
+- One-line install for Claude Desktop (Windows): `irm .../releases/latest/download/install.ps1 | iex`.
+  Release now carries `onenote-mcp.mcpb` (stable name) and `install.ps1` (SHA256 pinned).
+- `pack.ps1` rejects manifests with non-spec `${...}` variables and launch-tests the unpacked
+  bundle as `python -m onenote_mcp`.
+- README/INSTALL: `uvx` config for Cursor, VS Code, Claude Code.
+
 ## [1.1.0] - 2026-10-06
 
 Driven by the Glama scrape/email loop: Glama flagged missing notebook CRUD and weak
