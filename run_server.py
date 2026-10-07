@@ -20,9 +20,16 @@ import _strptime  # noqa: F401
 
 import mcp.types  # noqa: F401
 
+# Explicit MCP_TRANSPORT=stdio is how AI clients (Claude Desktop, Cursor, ...) launch this exe
+# after the installer registers it; the Tauri shell sets nothing and gets the HTTP sidecar.
+_STDIO = os.environ.get("MCP_TRANSPORT", "").lower() == "stdio"
 os.environ.setdefault("MCP_TRANSPORT", "http")
 
-if __name__ == "__main__":
+if __name__ == "__main__" and _STDIO:
+    from onenote_mcp.server import main
+
+    main()
+elif __name__ == "__main__":
     import uvicorn
 
     # Fleet standard: serve the CORS-wrapped mcp.http_app() directly.
