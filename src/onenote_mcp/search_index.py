@@ -17,8 +17,9 @@ from typing import Any
 logger = logging.getLogger("onenote_mcp.search_index")
 
 from .models import SearchHit
+from .paths import data_root
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = data_root()
 INDEX_PATH = PROJECT_ROOT / "data" / "search-index.db"
 
 _SCHEMA = """

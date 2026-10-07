@@ -34,6 +34,9 @@ param(
     [switch]$Uninstall,
     [switch]$List,
     [switch]$DryRun,
+    # Machine-readable result: one JSON array [{id,label,status,detail}] on stdout, nothing else.
+    # status: not-found | present | absent | registered | updated | removed | skipped | dry-run
+    [switch]$Json,
     # Test hook: resolve USERPROFILE / APPDATA under this folder instead of the real ones.
     [string]$ConfigRoot
 )
@@ -63,7 +66,10 @@ function Read-JsonFile([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
     $text = [IO.File]::ReadAllText($Path).TrimStart([char]0xFEFF)
     if ($text.Trim() -eq '') { return [pscustomobject]@{} }
-    if ($text -match '(?m)^\s*//' -or $text -match '/\*') { throw 'JSONC' }
+    # Comments (JSONC) would be silently dropped on rewrite, so refuse. Look only OUTSIDE string
+    # literals: a glob like "src/**/*.ts" inside a value is not a comment.
+    $outsideStrings = [regex]::Replace($text, '"(?:\\.|[^"\\])*"', '""')
+    if ($outsideStrings -match '//' -or $outsideStrings -match '/\*') { throw 'JSONC' }
     return ($text | ConvertFrom-Json)
 }
 
@@ -79,56 +85,69 @@ function New-Entry($shape) {
     return [pscustomobject]$e
 }
 
+$results = New-Object System.Collections.ArrayList
+$idByLabel = @{ 'Claude Code' = 'claude-code' }
+foreach ($d0 in $defs) { $idByLabel[$d0.Label] = $d0.Id }
+
 function Write-Result($label, $status, $detail) {
+    [void]$results.Add([pscustomobject]@{ id = $idByLabel[$label]; label = $label; status = $status; detail = [string]$detail })
+    if ($Json) { return }
     $color = switch ($status) { 'registered' { 'Green' } 'updated' { 'Green' } 'removed' { 'Green' } 'present' { 'Cyan' } 'skipped' { 'Yellow' } default { 'Gray' } }
     Write-Host ("  {0,-15} {1,-11} {2}" -f $label, $status, $detail) -ForegroundColor $color
 }
 
 foreach ($d in $defs) {
     if (-not (Test-Path -LiteralPath $d.Dir)) { Write-Result $d.Label 'not-found' ''; continue }
-    try { $json = Read-JsonFile $d.File }
+    try { $cfg = Read-JsonFile $d.File }
     catch {
-        Write-Result $d.Label 'skipped' "config has comments/invalid JSON; left untouched. Add '$Name' manually to $($d.File)"
+        $why = if ($_.Exception.Message -eq 'JSONC') { 'config has comments' } else { "config is not valid JSON ($($_.Exception.Message))" }
+        Write-Result $d.Label 'skipped' "$why; left untouched. Add '$Name' manually to $($d.File)"
         continue
     }
-    $has = $json -and $json.PSObject.Properties[$d.Key] -and $json.($d.Key).PSObject.Properties[$Name]
+    $has = $cfg -and $cfg.PSObject.Properties[$d.Key] -and $cfg.($d.Key).PSObject.Properties[$Name]
 
     if ($List) { Write-Result $d.Label ($(if ($has) { 'present' } else { 'absent' })) $d.File; continue }
     if ($Uninstall -and -not $has) { Write-Result $d.Label 'absent' ''; continue }
     if ($DryRun) { Write-Result $d.Label 'dry-run' $d.File; continue }
 
-    if ($null -eq $json) { $json = [pscustomobject]@{} }
+    if ($null -eq $cfg) { $cfg = [pscustomobject]@{} }
     if (Test-Path -LiteralPath $d.File) {
         $bak = "$($d.File)." + (Get-Date -Format 'yyyyMMdd_HHmmss') + '.bak'
         Copy-Item -LiteralPath $d.File $bak
     }
-    if (-not $json.PSObject.Properties[$d.Key]) { $json | Add-Member -NotePropertyName $d.Key -NotePropertyValue ([pscustomobject]@{}) }
+    if (-not $cfg.PSObject.Properties[$d.Key]) { $cfg | Add-Member -NotePropertyName $d.Key -NotePropertyValue ([pscustomobject]@{}) }
     if ($Uninstall) {
-        $json.($d.Key).PSObject.Properties.Remove($Name)
+        $cfg.($d.Key).PSObject.Properties.Remove($Name)
         $status = 'removed'
     } else {
-        $json.($d.Key) | Add-Member -NotePropertyName $Name -NotePropertyValue (New-Entry $d.Shape) -Force
+        $cfg.($d.Key) | Add-Member -NotePropertyName $Name -NotePropertyValue (New-Entry $d.Shape) -Force
         $status = if ($has) { 'updated' } else { 'registered' }
     }
     New-Item -ItemType Directory -Force -Path (Split-Path $d.File -Parent) | Out-Null
-    [IO.File]::WriteAllText($d.File, ($json | ConvertTo-Json -Depth 32), $utf8)
+    [IO.File]::WriteAllText($d.File, ($cfg | ConvertTo-Json -Depth 32), $utf8)
     Write-Result $d.Label $status $d.File
 }
 
 # Claude Code: use its own CLI (its ~/.claude.json holds much unrelated state; never hand-edit it).
 if (-not $Clients -or $Clients -contains 'claude-code') {
     $cc = Get-Command claude -ErrorAction SilentlyContinue
+    # `claude mcp ...` writes failures to stderr; under -ErrorAction Stop (PS 5.1) that becomes a
+    # terminating NativeCommandError, so run it with Continue and judge by exit code only.
+    function Invoke-Claude([string[]]$CliArgs) {
+        $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { & claude @CliArgs *> $null; return $LASTEXITCODE } finally { $ErrorActionPreference = $prev }
+    }
     if (-not $cc -or $ConfigRoot) { Write-Result 'Claude Code' 'not-found' '' }
-    elseif ($List) { & claude mcp get $Name *> $null; Write-Result 'Claude Code' ($(if ($LASTEXITCODE -eq 0) { 'present' } else { 'absent' })) '' }
+    elseif ($List) { Write-Result 'Claude Code' ($(if ((Invoke-Claude @('mcp', 'get', $Name)) -eq 0) { 'present' } else { 'absent' })) '(user scope)' }
     elseif ($DryRun) { Write-Result 'Claude Code' 'dry-run' '' }
-    elseif ($Uninstall) { & claude mcp remove --scope user $Name *> $null; Write-Result 'Claude Code' 'removed' '(user scope)' }
+    elseif ($Uninstall) { [void](Invoke-Claude @('mcp', 'remove', '--scope', 'user', $Name)); Write-Result 'Claude Code' 'removed' '(user scope)' }
     else {
-        & claude mcp remove --scope user $Name *> $null
+        [void](Invoke-Claude @('mcp', 'remove', '--scope', 'user', $Name))
         $ccArgs = @('mcp', 'add', '--scope', 'user', $Name)
         foreach ($k in $Env.Keys) { $ccArgs += @('-e', "$k=$($Env[$k])") }
         $ccArgs += @('--', $Command) + $Arguments
-        & claude @ccArgs *> $null
-        Write-Result 'Claude Code' ($(if ($LASTEXITCODE -eq 0) { 'registered' } else { 'skipped' })) '(user scope)'
+        Write-Result 'Claude Code' ($(if ((Invoke-Claude $ccArgs) -eq 0) { 'registered' } else { 'skipped' })) '(user scope)'
     }
 }
-Write-Host 'Restart the AI client(s) above to load the change.'
+if ($Json) { ConvertTo-Json -InputObject @($results) -Depth 4 -Compress }
+else { Write-Host 'Restart the AI client(s) above to load the change.' }

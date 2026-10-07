@@ -12,9 +12,11 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
+from .paths import data_root
+
 logger = logging.getLogger("onenote_mcp.export_notes")
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = data_root()
 EXPORT_ROOT = PROJECT_ROOT / "data" / "exports"
 
 _job: dict[str, Any] = {

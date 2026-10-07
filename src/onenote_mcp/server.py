@@ -23,23 +23,25 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 
-from . import search_index
-from .constants import AUTHORITY, CLIENT_ID, SCOPES, TOKEN_FILE_NAME
+from . import app_config, search_index, secure_store
+from . import mcp_clients as _mcp_clients
+from .constants import SCOPES, TOKEN_FILE_NAME
 from .export_notes import build_export as _build_export
 from .export_notes import job_status as _export_status
 from .markup import html_to_markdown, markdown_to_html
 from .models import Notebook, Page, Section, TOCData, TOCPage, TOCSection
+from .paths import data_root
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("onenote_mcp")
-_SERVER_VERSION = "1.2.0"
+_SERVER_VERSION = "1.3.0"
 _START_TIME = time.monotonic()
 
 # Fire-and-forget shutdown tasks (stored to satisfy RUF006)
 _shutdown_tasks: list[asyncio.Task] = []
 
 # Get the project root directory
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = data_root()  # source checkout: repo root; installed app: %LOCALAPPDATA%\com.sandraschi.onenote-mcp
 TOKEN_FILE_PATH = PROJECT_ROOT / TOKEN_FILE_NAME
 
 # Global state
@@ -54,7 +56,7 @@ _CACHE_PATH = PROJECT_ROOT / ".msal-token-cache.bin"
 _token_cache = msal.SerializableTokenCache()
 try:
     if _CACHE_PATH.exists():
-        _token_cache.deserialize(_CACHE_PATH.read_bytes().decode("utf-8"))
+        _token_cache.deserialize(secure_store.unprotect(_CACHE_PATH.read_bytes()).decode("utf-8"))
 except Exception as exc:
     logger.warning("Ignoring corrupt MSAL cache: %s", exc)
 
@@ -62,13 +64,15 @@ except Exception as exc:
 def _save_cache() -> None:
     if _token_cache.has_state_changed:
         try:
-            _CACHE_PATH.write_bytes(_token_cache.serialize().encode("utf-8"))
+            _CACHE_PATH.write_bytes(secure_store.protect(_token_cache.serialize().encode("utf-8")))
         except Exception as exc:
             logger.warning("Could not persist MSAL cache: %s", exc)
 
 
 def _msal_app() -> msal.PublicClientApplication:
-    return msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY, token_cache=_token_cache)
+    return msal.PublicClientApplication(
+        app_config.require_client_id(), authority=app_config.authority(), token_cache=_token_cache
+    )
 
 
 def try_silent_auth() -> str | None:
@@ -118,7 +122,7 @@ def load_access_token() -> str | None:
     # Try to read from file
     try:
         if TOKEN_FILE_PATH.exists():
-            token_data = TOKEN_FILE_PATH.read_text().strip()
+            token_data = secure_store.unprotect(TOKEN_FILE_PATH.read_bytes()).decode("utf-8").strip()
             try:
                 # Try parsing as JSON first (new format)
                 parsed_token = json.loads(token_data)
@@ -149,7 +153,7 @@ def save_access_token(token: str) -> None:
     _graph_client = None
 
     token_data = json.dumps({"token": token}, indent=2)
-    TOKEN_FILE_PATH.write_text(token_data)
+    TOKEN_FILE_PATH.write_bytes(secure_store.protect(token_data.encode("utf-8")))
     logger.info("Access token saved to %s", TOKEN_FILE_PATH)
 
 
@@ -673,7 +677,12 @@ async def api_status(request: Request) -> JSONResponse:
             "version": _SERVER_VERSION,
             "uptime_seconds": int(time.monotonic() - _START_TIME),
             "tool_count": await _tool_count(),
-            "providers": {"graph": {"authenticated": bool(load_access_token())}},
+            "providers": {
+                "graph": {
+                    "configured": app_config.is_configured(),
+                    "authenticated": bool(load_access_token()),
+                }
+            },
         }
     )
 
@@ -922,6 +931,50 @@ async def api_shutdown(request: Request) -> JSONResponse:
     return JSONResponse({"success": True, "message": "Server shutting down..."})
 
 
+# ---- AI-client registration (Claude Desktop, Cursor, Antigravity, Windsurf, OpenCode, Claude Code) ----
+
+
+@app.custom_route("/api/mcp-clients", methods=["GET"])
+async def api_mcp_clients(request: Request) -> JSONResponse:
+    """Detected AI clients and whether this server is registered in each."""
+    try:
+        data = await asyncio.to_thread(_mcp_clients.status)
+    except _mcp_clients.ClientsError as exc:
+        logger.warning("mcp-clients status failed: %s", exc)
+        return JSONResponse({"success": False, "message": str(exc), "clients": []}, status_code=503)
+    return JSONResponse({"success": True, "message": "ok", **data})
+
+
+async def _mcp_clients_change(request: Request, action: Literal["register", "unregister"]) -> JSONResponse:
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    clients = body.get("clients") if isinstance(body, dict) else None
+    if clients is not None and not (isinstance(clients, list) and all(isinstance(c, str) for c in clients)):
+        return JSONResponse({"success": False, "message": "'clients' must be a list of client ids"}, status_code=400)
+    fn = _mcp_clients.register if action == "register" else _mcp_clients.unregister
+    try:
+        rows = await asyncio.to_thread(fn, clients)
+    except ValueError as exc:
+        return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
+    except _mcp_clients.ClientsError as exc:
+        logger.warning("mcp-clients %s failed: %s", action, exc)
+        return JSONResponse({"success": False, "message": str(exc)}, status_code=503)
+    logger.info("mcp-clients %s: %s", action, {r.get("id"): r.get("status") for r in rows})
+    return JSONResponse({"success": True, "message": "Restart the AI tool(s) to load the change.", "results": rows})
+
+
+@app.custom_route("/api/mcp-clients/register", methods=["POST"])
+async def api_mcp_clients_register(request: Request) -> JSONResponse:
+    return await _mcp_clients_change(request, "register")
+
+
+@app.custom_route("/api/mcp-clients/unregister", methods=["POST"])
+async def api_mcp_clients_unregister(request: Request) -> JSONResponse:
+    return await _mcp_clients_change(request, "unregister")
+
+
 # ---- Webapp activity log (ring buffer) ----
 
 from .activity_log import ActivityLog
@@ -1062,7 +1115,53 @@ async def api_auth_status(request: Request) -> JSONResponse:
 
 _auth_code_flows: dict[str, dict[str, Any]] = {}
 
-REDIRECT_URI = os.environ.get("ONENOTE_REDIRECT_URI", "http://localhost:10907/api/auth/callback")
+
+def _redirect_uri() -> str:
+    """Where Microsoft sends the browser back: THIS process's own port (dev 10907, installed app 11250).
+
+    A hardcoded dev port made browser sign-in fail in the installed app, whose backend listens elsewhere.
+    ``ONENOTE_REDIRECT_URI`` overrides. Loopback redirects ignore the port in the Entra registration.
+    """
+    override = os.environ.get("ONENOTE_REDIRECT_URI")
+    if override:
+        return override
+    port = os.environ.get("PORT") or os.environ.get("ONENOTE_PORT") or os.environ.get("MCP_PORT") or "10907"
+    return f"http://localhost:{port}/api/auth/callback"
+
+
+@app.custom_route("/api/auth/config", methods=["GET"])
+async def api_auth_config(request: Request) -> JSONResponse:
+    """The user's Microsoft app registration state + what the UI needs to guide creating one."""
+    return JSONResponse({"success": True, **app_config.public_state(_redirect_uri())})
+
+
+@app.custom_route("/api/auth/config", methods=["POST"])
+async def api_auth_config_save(request: Request) -> JSONResponse:
+    """Store the user's own Application (client) ID and account type (settings.json in the data folder)."""
+    global _access_token, _graph_client
+    if app_config.source() == "env":
+        return JSONResponse(
+            {"success": False, "message": "The client ID is set by the ONENOTE_CLIENT_ID environment variable."},
+            status_code=409,
+        )
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    if not isinstance(body, dict):
+        return JSONResponse({"success": False, "message": "JSON object expected"}, status_code=400)
+    try:
+        changed = app_config.save(
+            str(body.get("client_id", "")), str(body.get("audience", app_config.DEFAULT_AUDIENCE))
+        )
+    except ValueError as exc:
+        return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
+    if changed:  # tokens belong to the previous app registration
+        _access_token = None
+        _graph_client = None
+        TOKEN_FILE_PATH.unlink(missing_ok=True)
+    _log.info("auth", f"app registration saved (client id ...{app_config.client_id()[-4:]}, changed={changed})")
+    return JSONResponse({"success": True, "message": "Saved. Now sign in.", **app_config.public_state(_redirect_uri())})
 
 
 @app.custom_route("/api/auth/login", methods=["GET"])
@@ -1071,8 +1170,11 @@ async def api_auth_login(request: Request) -> JSONResponse:
     now = time.time()
     for state in [s for s, e in _auth_code_flows.items() if now - e["started"] > 600]:
         _auth_code_flows.pop(state, None)
-    app = _msal_app()
-    flow = app.initiate_auth_code_flow(SCOPES, redirect_uri=REDIRECT_URI)
+    try:
+        app = _msal_app()
+    except app_config.NotConfiguredError as exc:
+        return JSONResponse({"success": False, "needs_registration": True, "error": str(exc)}, status_code=409)
+    flow = app.initiate_auth_code_flow(SCOPES, redirect_uri=_redirect_uri())
     if "auth_uri" not in flow:
         err = flow.get("error_description", flow.get("error", "unknown"))
         _log.error("auth", f"browser login start failed: {err}")
@@ -1151,8 +1253,8 @@ async def api_auth_debug(request: Request) -> JSONResponse:
     audience, scopes, appid, tenant, account, and expiry."""
     token = load_access_token()
     info: dict[str, Any] = {
-        "client_id_suffix": CLIENT_ID[-4:],
-        "authority": AUTHORITY,
+        "client_id_suffix": app_config.client_id()[-4:],
+        "authority": app_config.authority(),
         "scopes_requested": SCOPES,
         "token_present": bool(token),
         "token_format": None,
