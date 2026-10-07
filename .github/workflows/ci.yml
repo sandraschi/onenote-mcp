@@ -34,7 +34,7 @@ jobs:
         shell: pwsh
         run: |
           foreach ($d in @('webapp', 'web_sota', 'web-sota')) {
-            if (Test-Path "$d/package-lock.json") {
+            if (Test-Path "$d/bun.lock") {
               "dir=$d" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8NoBOM
               exit 0
             }
@@ -46,8 +46,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: ${{ steps.frontend.outputs.dir }}/package-lock.json
+
+      - name: Set up Bun
+        if: steps.frontend.outputs.dir != ''
+        uses: oven-sh/setup-bun@v2
 
       - name: Install Python dependencies
         shell: pwsh
@@ -140,7 +142,7 @@ jobs:
 
       - name: Install web dependencies
         if: steps.frontend.outputs.dir != ''
-        run: npm ci
+        run: bun install --frozen-lockfile
         working-directory: ${{ steps.frontend.outputs.dir }}
 
       - name: Typecheck
@@ -151,9 +153,9 @@ jobs:
           $pkg = Get-Content package.json -Raw | ConvertFrom-Json
           $scripts = $pkg.scripts | Get-Member -MemberType NoteProperty | ForEach-Object { $_.Name }
           if ('check' -in $scripts) {
-            npm run check
+            bun run check
           } elseif ('typecheck' -in $scripts) {
-            npm run typecheck
+            bun run typecheck
           } else {
             Write-Host "no typecheck: no 'check' or 'typecheck' script in package.json"
           }
@@ -166,9 +168,9 @@ jobs:
           $pkg = Get-Content package.json -Raw | ConvertFrom-Json
           $scripts = $pkg.scripts | Get-Member -MemberType NoteProperty | ForEach-Object { $_.Name }
           if ('biome:ci' -in $scripts) {
-            npm run biome:ci
+            bun run biome:ci
           } elseif ('lint' -in $scripts) {
-            npm run lint
+            bun run lint
           } else {
             Write-Host "no linter: no 'biome:ci' or 'lint' script in package.json"
           }

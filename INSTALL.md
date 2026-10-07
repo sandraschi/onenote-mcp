@@ -27,26 +27,19 @@ Whichever you pick, you sign in to your Microsoft account **once** (see [First u
 
 Windows only. `.mcpb` add-ons are a Claude Desktop format; other tools use section C.
 
-**Step 1 - install `uv` (once).** `uv` is a small, free helper program that fetches and runs the
-Python parts of this add-on for you, including Python itself. You never use it directly. Open
-**Windows PowerShell** and run:
-
-```powershell
-winget install astral-sh.uv
-```
-
-Then close and reopen PowerShell.
-
-**Step 2 - install the add-on.** In PowerShell:
+**Step 1 - install the add-on.** Open **Windows PowerShell** and run:
 
 ```powershell
 irm https://github.com/sandraschi/onenote-mcp/releases/latest/download/install.ps1 | iex
 ```
 
-**Step 3 - restart Claude Desktop completely.** Right-click its icon in the system tray, choose
+The installer also sets up `uv` for you if it is missing (a small, free helper that runs the
+add-on's Python parts, including Python itself). You never use it directly.
+
+**Step 2 - restart Claude Desktop completely.** Right-click its icon in the system tray, choose
 *Quit*, then start it again. OneNote MCP now appears under *Settings > Extensions*.
 
-Other ways to do step 2:
+Other ways to do step 1 (these two do **not** install `uv`; run `winget install astral-sh.uv` first):
 - Tell Claude: *install https://github.com/sandraschi/onenote-mcp/releases/latest/download/onenote-mcp.mcpb*
 - Download `onenote-mcp.mcpb` from the [latest release](https://github.com/sandraschi/onenote-mcp/releases/latest)
   and double-click it.
@@ -55,7 +48,9 @@ Other ways to do step 2:
 
 ## C. Other AI tools (Cursor, VS Code, Claude Code)
 
-Do **Step 1 (uv)** from section B first. Then add this to the tool's MCP settings file
+These tools launch the server with `uvx` (part of `uv`, a small free helper that runs Python
+programs). Install it once in PowerShell with `winget install astral-sh.uv`, then reopen the
+terminal. Then add this to the tool's MCP settings file
 (Cursor: `%USERPROFILE%\.cursor\mcp.json`):
 
 ```json

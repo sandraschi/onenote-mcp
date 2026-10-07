@@ -15,7 +15,7 @@ foreach ($dir in $frontendDirs) {
     if (Test-Path "$frontend\package.json") {
         Write-Host "-> [1/4] Building frontend ($dir)..." -ForegroundColor Yellow
         Push-Location $frontend
-        npm install --silent 2>$null
+        & "$env:USERPROFILE\.bun\bin\bun.exe" install --frozen-lockfile
 
         Write-Host "  tsc --noEmit..." -ForegroundColor Gray
         $tscOut = npx tsc --noEmit 2>&1
@@ -26,7 +26,7 @@ foreach ($dir in $frontendDirs) {
             throw "TypeScript compilation failed - fix all errors before building NSIS installer"
         }
 
-        npm run build
+        & "$env:USERPROFILE\.bun\bin\bun.exe" run build
         if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
         Pop-Location
         break

@@ -12,7 +12,7 @@ default:
 bootstrap:
     uv sync --extra dev --group dev
     uv run pre-commit install
-    Set-Location web_sota; npm ci; if ($LASTEXITCODE -ne 0) { npm install }
+    Set-Location web_sota; & "$env:USERPROFILE\.bun\bin\bun.exe" install --frozen-lockfile
     Write-Host "Pre-commit hooks installed." -ForegroundColor Green
 # -----------------------------------------------------------------------------
 # Quality
