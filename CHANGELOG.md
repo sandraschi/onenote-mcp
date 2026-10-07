@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.0] - 2026-10-07
+
+### Added
+- **Windows installer registers OneNote MCP in your AI tools.** A new installer page (checkbox,
+  on by default) adds it to every detected client: Claude Desktop, Cursor, Antigravity, Windsurf,
+  OpenCode, and Claude Code via its CLI. Merge-only with timestamped backups; uninstall removes
+  the entries. `/S` registers silently, `/NOMCP` skips. Registered over stdio: no `uv` or Python
+  needed, and it works whether or not the app is running.
+- The bundled backend exe now serves MCP over stdio when launched with `MCP_TRANSPORT=stdio`
+  (the app itself still gets HTTP); the build gates on a real stdio initialize + tools/list.
+- `install.ps1` (Claude Desktop add-on) installs `uv` automatically when missing.
+
+### Changed
+- Web UI: bun instead of npm (`bun.lock`), WCAG-contrast text colours, no tiny label text, the
+  real API origin is shown instead of a hardcoded dev port.
+- Removed an unused self-referencing `file:..` dependency from `web_sota`.
+
+### Fixed
+- 16 pyright errors in `markup.py` that failed the CI type gate.
+
 ## [1.1.1] - 2026-10-07
 
 Packaging-only release: the v1.1.0 `.mcpb` could not start in Claude Desktop.

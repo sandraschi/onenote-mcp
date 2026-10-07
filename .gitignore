@@ -89,3 +89,6 @@ _dashboard/
 reports/
 web_sota/test-results/
 cua-reports/
+
+# generated per build from the Tauri CLI template + fleet patch (the vendored fleet copies are committed)
+native/windows/installer.template.nsi

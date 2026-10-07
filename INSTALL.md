@@ -15,11 +15,17 @@ Whichever you pick, you sign in to your Microsoft account **once** (see [First u
 
 ## A. Windows app
 
-1. Download the installer: [onenote-mcp-v1.1.0-setup.exe](https://github.com/sandraschi/onenote-mcp/releases/download/v1.1.0/onenote-mcp-v1.1.0-setup.exe)
+1. Download the installer: [onenote-mcp-setup.exe](https://github.com/sandraschi/onenote-mcp/releases/latest/download/onenote-mcp-setup.exe)
    (all versions are on the [Releases page](https://github.com/sandraschi/onenote-mcp/releases)).
 2. Double-click it and follow the prompts. If Windows warns about an unknown publisher, that is
    the installer not being code-signed; choose *More info*, then *Run anyway*.
-3. Start **OneNote MCP** from the Start menu. Nothing else to install: the app brings its own engine.
+3. **AI tool integration page:** if the installer finds Claude Desktop, Cursor, Antigravity,
+   Windsurf or OpenCode on your computer, it offers to add OneNote MCP to them. The box is ticked
+   by default; untick it to skip. (Claude Code is registered too when its `claude` command is
+   available.) Restart those tools afterwards. Uninstalling removes the entries again.
+4. Start **OneNote MCP** from the Start menu. Nothing else to install: the app brings its own engine.
+
+Silent install: `onenote-mcp-setup.exe /S` (registers in detected AI tools; add `/NOMCP` to skip).
 
 ---
 
