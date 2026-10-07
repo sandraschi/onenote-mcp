@@ -256,7 +256,7 @@ export function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center">
-                <HardDrive className="h-4 w-4 text-slate-400 mr-2" />
+                <HardDrive className="h-4 w-4 text-slate-300 mr-2" />
                 <div className="ml-2 space-y-1">
                   <p className="text-sm font-medium leading-none text-white">
                     Not signed in yet?

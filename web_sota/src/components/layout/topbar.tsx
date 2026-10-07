@@ -8,14 +8,14 @@ export function Topbar() {
   return (
     <header className="flex h-14 items-center justify-between border-b border-slate-800 bg-slate-950/50 px-6 backdrop-blur-xl">
       <div className="flex items-center gap-4">
-        <h1 className="text-sm font-medium text-slate-400">
+        <h1 className="text-sm font-medium text-slate-300">
           Navigation / <span className="text-slate-100">Control Center</span>
         </h1>
       </div>
 
       <div className="flex items-center gap-2">
         {/* System Status Indicator */}
-        <div className="mr-4 flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-500 border border-emerald-500/20">
+        <div className="mr-4 flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-sm text-emerald-500 border border-emerald-500/20">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -38,7 +38,7 @@ export function Topbar() {
               sideOffset={5}
               align="end"
             >
-              <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-slate-500">
+              <DropdownMenu.Label className="px-2 py-1.5 text-sm font-semibold text-slate-300">
                 Switch Application
               </DropdownMenu.Label>
 
@@ -50,7 +50,7 @@ export function Topbar() {
                     href={app.url}
                     className="flex w-full select-none items-center rounded-sm px-2 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white focus:bg-slate-800 focus:text-white outline-none cursor-pointer"
                   >
-                    <app.icon className="mr-2 h-4 w-4 text-slate-400" />
+                    <app.icon className="mr-2 h-4 w-4 text-slate-300" />
                     <span>{app.label}</span>
                     <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
                   </a>
@@ -60,7 +60,7 @@ export function Topbar() {
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
 
-        <button className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-800 bg-slate-900/50 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+        <button className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-800 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
           <HelpCircle className="h-4 w-4" />
         </button>
       </div>

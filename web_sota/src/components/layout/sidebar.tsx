@@ -96,7 +96,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           data-testid="sidebar-toggle"
-          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          className="rounded-md p-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
         >
           {collapsed ? (
             <ChevronRight className="h-5 w-5" />
@@ -115,7 +115,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               to={item.href}
               className={cn(
                 "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white",
-                isActive ? "bg-slate-800 text-white" : "text-slate-400",
+                isActive ? "bg-slate-800 text-white" : "text-slate-300",
                 collapsed ? "justify-center" : "justify-start",
               )}
             >
@@ -130,7 +130,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
               {/* Tooltip for collapsed mode */}
               {collapsed && (
-                <div className="absolute left-full ml-2 hidden rounded bg-slate-800 px-2 py-1 text-xs text-white group-hover:block z-50 whitespace-nowrap">
+                <div className="absolute left-full ml-2 hidden rounded bg-slate-800 px-2 py-1 text-sm text-white group-hover:block z-50 whitespace-nowrap">
                   {item.label}
                 </div>
               )}
@@ -142,7 +142,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="border-t border-slate-800 p-2">
         <div
           className={cn(
-            "flex items-center gap-2 px-3 py-2 text-sm text-slate-400",
+            "flex items-center gap-2 px-3 py-2 text-sm text-slate-300",
             collapsed && "justify-center px-0",
           )}
           title={
