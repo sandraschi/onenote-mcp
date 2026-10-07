@@ -2,6 +2,7 @@
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": ["sandraschi"],
   "name": "onenote-mcp",
+  "version": "1.2.0",
   "description": "Microsoft OneNote integration via Microsoft Graph API. Complete notebook, section, and page management with text extraction and content operations.",
   "type": "mcp_server",
   "status": "beta",
