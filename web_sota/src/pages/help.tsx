@@ -1,5 +1,6 @@
 import { Book, Code, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { API_ORIGIN } from "../lib/api";
 
 export function Help() {
   return (
@@ -91,7 +92,7 @@ export function Help() {
               </tr>
               <tr>
                 <td className="py-2 font-medium text-slate-200">Backend API</td>
-                <td className="py-2">http://127.0.0.1:10907/api/*</td>
+                <td className="py-2">{API_ORIGIN}/api/*</td>
               </tr>
             </tbody>
           </table>

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { API_BASE } from "../lib/api";
+import { API_BASE, API_ORIGIN } from "../lib/api";
 import { PROVIDER_ORDER, useLlmStore } from "../store/llm";
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -142,7 +142,7 @@ export function Settings() {
               <Label className="text-slate-300">API Host</Label>
               <Input
                 className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-300"
-                defaultValue="http://127.0.0.1:10907"
+                defaultValue={API_ORIGIN}
                 readOnly
               />
             </div>

@@ -8,6 +8,12 @@ export const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (isTauri ? "http://127.0.0.1:11250/api" : "/api");
 
+/** Origin the API is actually reached at (for display; never a hardcoded port). */
+export const API_ORIGIN =
+  typeof window === "undefined"
+    ? ""
+    : new URL(API_BASE, window.location.href).origin;
+
 export async function fetchJson<T = unknown>(
   path: string,
   init?: RequestInit,
