@@ -1,95 +1,124 @@
 # Installation
 
-## 🧩 As an AI-client extension (no clone needed)
+Pick the one that matches how you want to use OneNote MCP.
 
-Requires [uv](https://docs.astral.sh/uv/) (`winget install astral-sh.uv`).
+| I want... | Use |
+|---|---|
+| A normal Windows app with a window, no AI client needed | [A. Windows app](#a-windows-app) |
+| My notes available inside **Claude Desktop** | [B. Claude Desktop add-on](#b-claude-desktop-add-on) |
+| My notes in **Cursor, VS Code, Claude Code** or another AI tool | [C. Other AI tools](#c-other-ai-tools-cursor-vs-code-claude-code) |
+| To work on the code | [D. For developers](#d-for-developers) |
 
-**Claude Desktop (Windows)** - `.mcpb` is a Claude Desktop format. In Windows PowerShell:
+Whichever you pick, you sign in to your Microsoft account **once** (see [First use](#first-use-sign-in)).
+
+---
+
+## A. Windows app
+
+1. Download the installer: [onenote-mcp-v1.1.0-setup.exe](https://github.com/sandraschi/onenote-mcp/releases/download/v1.1.0/onenote-mcp-v1.1.0-setup.exe)
+   (all versions are on the [Releases page](https://github.com/sandraschi/onenote-mcp/releases)).
+2. Double-click it and follow the prompts. If Windows warns about an unknown publisher, that is
+   the installer not being code-signed; choose *More info*, then *Run anyway*.
+3. Start **OneNote MCP** from the Start menu. Nothing else to install: the app brings its own engine.
+
+---
+
+## B. Claude Desktop add-on
+
+Windows only. `.mcpb` add-ons are a Claude Desktop format; other tools use section C.
+
+**Step 1 - install `uv` (once).** `uv` is a small, free helper program that fetches and runs the
+Python parts of this add-on for you, including Python itself. You never use it directly. Open
+**Windows PowerShell** and run:
+
+```powershell
+winget install astral-sh.uv
+```
+
+Then close and reopen PowerShell.
+
+**Step 2 - install the add-on.** In PowerShell:
 
 ```powershell
 irm https://github.com/sandraschi/onenote-mcp/releases/latest/download/install.ps1 | iex
 ```
 
-Then quit Claude Desktop from the tray and relaunch. The script downloads
-`onenote-mcp.mcpb`, verifies its SHA256, and registers it with Claude Desktop. Alternatives:
-tell Claude *install https://github.com/sandraschi/onenote-mcp/releases/latest/download/onenote-mcp.mcpb*,
-or download the `.mcpb` from the release and double-click it. If the extension does not show up
-under Settings > Extensions, use the double-click route.
+**Step 3 - restart Claude Desktop completely.** Right-click its icon in the system tray, choose
+*Quit*, then start it again. OneNote MCP now appears under *Settings > Extensions*.
 
-**Cursor / VS Code / any other MCP client** - add to the client's MCP config
-(Cursor: `~/.cursor/mcp.json`):
+Other ways to do step 2:
+- Tell Claude: *install https://github.com/sandraschi/onenote-mcp/releases/latest/download/onenote-mcp.mcpb*
+- Download `onenote-mcp.mcpb` from the [latest release](https://github.com/sandraschi/onenote-mcp/releases/latest)
+  and double-click it.
+
+---
+
+## C. Other AI tools (Cursor, VS Code, Claude Code)
+
+Do **Step 1 (uv)** from section B first. Then add this to the tool's MCP settings file
+(Cursor: `%USERPROFILE%\.cursor\mcp.json`):
 
 ```json
-{ "mcpServers": { "onenote": { "command": "uvx",
-  "args": ["--from", "git+https://github.com/sandraschi/onenote-mcp", "onenote-mcp"] } } }
+{
+  "mcpServers": {
+    "onenote": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/sandraschi/onenote-mcp", "onenote-mcp"]
+    }
+  }
+}
 ```
 
-**Claude Code:** `claude mcp add onenote -- uvx --from git+https://github.com/sandraschi/onenote-mcp onenote-mcp`
-
-First use: sign in with Microsoft once (see [docs/ONBOARDING.md](docs/ONBOARDING.md)).
-
-## 🚀 Quick Start from source (recommended for development)
+Claude Code, one command instead:
 
 ```powershell
-# Install just if you don't have it
-winget install Casey.Just    # Windows
-# scoop install just          # Windows (alternative)
-# brew install just           # macOS
-# sudo apt install just       # Debian/Ubuntu
-# cargo install just          # Linux (Rust)
+claude mcp add onenote -- uvx --from git+https://github.com/sandraschi/onenote-mcp onenote-mcp
+```
 
+---
+
+## First use: sign in
+
+OneNote data comes from your Microsoft account, so you sign in once:
+
+- **In Claude / your AI tool:** ask *"Sign in to my OneNote"*. You get a short code and the page
+  `https://microsoft.com/devicelogin`; enter the code there.
+- **In the Windows app:** *Notebooks* page, **Sign in with Microsoft**.
+
+Personal Microsoft accounts work. The session renews itself, so you stay signed in for about 90 days.
+More detail: [docs/ONBOARDING.md](docs/ONBOARDING.md).
+
+---
+
+## D. For developers
+
+```powershell
+winget install Casey.Just
 git clone https://github.com/sandraschi/onenote-mcp
 cd onenote-mcp
-just
+just bootstrap   # install all dependencies
+just serve       # backend :10907 + webapp :10906
 ```
 
-The interactive recipe dashboard opens in your browser. From there:
+Without `just`: install [Python 3.12+](https://python.org) and [uv](https://docs.astral.sh/uv/), then
 
 ```powershell
-just bootstrap   # install all dependencies
-just serve       # start the server
-just web         # start the frontend (if applicable)
+uv sync --all-extras
+uv run python -m onenote_mcp           # stdio, for MCP clients
+uv run uvicorn onenote_mcp.server:http_app --port 10907   # HTTP, for the web dashboard
 ```
 
-> **Why not `pip install`?** MCP servers bundle webapps, configs, project scaffolding, and tooling that a flat Python package can't deliver. PyPI offers no safety advantage — it doesn't audit packages either. `just` gives you the complete, ready-to-run stack.
-
 ---
 
-## 🐌 Traditional Setup
+## Troubleshooting
 
-If you prefer not to use `just`:
-
-1. Install [Python 3.13+](https://python.org) and [uv](https://docs.astral.sh/uv/)
-2. Clone and enter the repo:
-   ```powershell
-   git clone https://github.com/sandraschi/onenote-mcp
-   cd onenote-mcp
-   ```
-3. Install dependencies:
-   ```powershell
-   uv sync --all-extras
-   ```
-4. Start the server:
-   ```powershell
-   # stdio mode (for MCP clients like Claude Desktop)
-   uv run python -m onenote_mcp.server
-
-   # HTTP mode (for web dashboard)
-   uv run uvicorn onenote_mcp.server:http_app --port 10907
-   ```
-5. Open `http://localhost:10907` or the frontend URL.
-
----
-
-## ❓ Troubleshooting
-
-| Issue | Fix |
+| Problem | Fix |
 |---|---|
-| `just` not found | Install via `winget install Casey.Just`, `scoop install just`, or `brew install just` |
-| Port conflict | Run `just kill-all` to clear fleet ports (10700–11000) |
-| Dependencies out of sync | `uv sync --all-extras` |
+| `winget` is not recognised | Update "App Installer" in the Microsoft Store, or install uv from <https://docs.astral.sh/uv/> |
+| `uv` is not recognised after installing | Close and reopen PowerShell |
+| Extension missing in Claude Desktop | You must *Quit* Claude from the tray, not just close the window; or use the double-click route in B |
+| Add-on shows an error on start | Check `uv` is installed (`uv --version`) |
+| Port conflict (developers) | `just kill-all` clears fleet ports 10700-11000 |
 | Something else | [Open a GitHub issue](https://github.com/sandraschi/onenote-mcp/issues) |
 
----
-
-*See the main [README](README.md) for feature overview and documentation.*
+*Feature overview: [README](README.md).*

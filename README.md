@@ -35,50 +35,10 @@ for official links, community, and disambiguation from similarly-named projects.
 - Ask the chat about your notes (local LLM via backend proxy, nothing leaks)
 - Run headless, as a Tauri desktop app, or from a `.mcpb` bundle
 
-## Install in your AI client
+## Install
 
-### Claude Desktop (Windows) - one line
-
-Paste in **Windows PowerShell**, then quit Claude Desktop from the tray and relaunch:
-
-```powershell
-irm https://github.com/sandraschi/onenote-mcp/releases/latest/download/install.ps1 | iex
-```
-
-Or tell Claude: *install https://github.com/sandraschi/onenote-mcp/releases/latest/download/onenote-mcp.mcpb*,
-or download `onenote-mcp.mcpb` from the [latest release](https://github.com/sandraschi/onenote-mcp/releases/latest)
-and double-click it. Requires [uv](https://docs.astral.sh/uv/). `.mcpb` is a Claude Desktop format -
-other clients use the config below.
-
-### Cursor, VS Code, Claude Code, any other MCP client
-
-Needs [uv](https://docs.astral.sh/uv/). Add to the client's MCP config (Cursor: `~/.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "onenote": {
-      "command": "uvx",
-      "args": ["--from", "git+https://github.com/sandraschi/onenote-mcp", "onenote-mcp"]
-    }
-  }
-}
-```
-
-Claude Code: `claude mcp add onenote -- uvx --from git+https://github.com/sandraschi/onenote-mcp onenote-mcp`
-
-## Quick Install (from source)
-
-```powershell
-just bootstrap   # deps (Windows: winget installs in docs/DEVELOPMENT.md)
-just serve       # backend :10907 + webapp :10906, browser opens itself
-```
-
-First run: open the Notebooks page → **Sign in with Microsoft** (free app
-registration, personal accounts OK) — once. The backend renews the session
-itself every hour, so you stay signed in for ~90 days without touching
-anything. Full paths: [INSTALL.md](INSTALL.md),
-[docs/ONBOARDING.md](docs/ONBOARDING.md).
+**[Installation guide: INSTALL.md](INSTALL.md)** - a Windows app, a one-line add-on for Claude Desktop,
+or a config snippet for Cursor, VS Code and Claude Code.
 
 ## Example Prompts
 
