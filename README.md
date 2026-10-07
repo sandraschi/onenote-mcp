@@ -35,7 +35,39 @@ for official links, community, and disambiguation from similarly-named projects.
 - Ask the chat about your notes (local LLM via backend proxy, nothing leaks)
 - Run headless, as a Tauri desktop app, or from a `.mcpb` bundle
 
-## Quick Install
+## Install in your AI client
+
+### Claude Desktop (Windows) - one line
+
+Paste in **Windows PowerShell**, then quit Claude Desktop from the tray and relaunch:
+
+```powershell
+irm https://github.com/sandraschi/onenote-mcp/releases/latest/download/install.ps1 | iex
+```
+
+Or tell Claude: *install https://github.com/sandraschi/onenote-mcp/releases/latest/download/onenote-mcp.mcpb*,
+or download `onenote-mcp.mcpb` from the [latest release](https://github.com/sandraschi/onenote-mcp/releases/latest)
+and double-click it. Requires [uv](https://docs.astral.sh/uv/). `.mcpb` is a Claude Desktop format -
+other clients use the config below.
+
+### Cursor, VS Code, Claude Code, any other MCP client
+
+Needs [uv](https://docs.astral.sh/uv/). Add to the client's MCP config (Cursor: `~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "onenote": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/sandraschi/onenote-mcp", "onenote-mcp"]
+    }
+  }
+}
+```
+
+Claude Code: `claude mcp add onenote -- uvx --from git+https://github.com/sandraschi/onenote-mcp onenote-mcp`
+
+## Quick Install (from source)
 
 ```powershell
 just bootstrap   # deps (Windows: winget installs in docs/DEVELOPMENT.md)

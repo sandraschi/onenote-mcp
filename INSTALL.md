@@ -1,6 +1,34 @@
 # Installation
 
-## 🚀 Quick Start (recommended)
+## 🧩 As an AI-client extension (no clone needed)
+
+Requires [uv](https://docs.astral.sh/uv/) (`winget install astral-sh.uv`).
+
+**Claude Desktop (Windows)** - `.mcpb` is a Claude Desktop format. In Windows PowerShell:
+
+```powershell
+irm https://github.com/sandraschi/onenote-mcp/releases/latest/download/install.ps1 | iex
+```
+
+Then quit Claude Desktop from the tray and relaunch. The script downloads
+`onenote-mcp.mcpb`, verifies its SHA256, and registers it with Claude Desktop. Alternatives:
+tell Claude *install https://github.com/sandraschi/onenote-mcp/releases/latest/download/onenote-mcp.mcpb*,
+or download the `.mcpb` from the release and double-click it. If the extension does not show up
+under Settings > Extensions, use the double-click route.
+
+**Cursor / VS Code / any other MCP client** - add to the client's MCP config
+(Cursor: `~/.cursor/mcp.json`):
+
+```json
+{ "mcpServers": { "onenote": { "command": "uvx",
+  "args": ["--from", "git+https://github.com/sandraschi/onenote-mcp", "onenote-mcp"] } } }
+```
+
+**Claude Code:** `claude mcp add onenote -- uvx --from git+https://github.com/sandraschi/onenote-mcp onenote-mcp`
+
+First use: sign in with Microsoft once (see [docs/ONBOARDING.md](docs/ONBOARDING.md)).
+
+## 🚀 Quick Start from source (recommended for development)
 
 ```powershell
 # Install just if you don't have it
