@@ -200,7 +200,7 @@ export function Status() {
             >
               {notebookCount ?? "-"}
             </div>
-            <p className="text-sm text-slate-400">in your account</p>
+            <p className="text-sm text-slate-300">in your account</p>
           </CardContent>
         </Card>
         <Card className="border-slate-800 bg-slate-950/50">
@@ -218,7 +218,7 @@ export function Status() {
               {index?.indexed_pages ?? "-"}
             </div>
             <p
-              className="text-sm text-slate-400"
+              className="text-sm text-slate-300"
               data-testid="status-index-state"
             >
               {!index || index.state === "idle"

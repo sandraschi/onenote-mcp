@@ -320,7 +320,7 @@ export function Notebooks() {
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
             <input
               data-testid="notebook-search"
               className="bg-slate-900 border border-slate-700 rounded-md pl-8 pr-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 w-64"
@@ -397,7 +397,7 @@ export function Notebooks() {
                 </a>
                 .
               </p>
-              <p className="text-sm text-slate-400 flex items-center justify-end gap-1.5">
+              <p className="text-sm text-slate-300 flex items-center justify-end gap-1.5">
                 <Loader2 className="h-3 w-3 animate-spin" /> Waiting for
                 sign-in...
               </p>
@@ -409,15 +409,15 @@ export function Notebooks() {
       <div className="grid grid-cols-[280px_1fr] gap-4 min-h-[420px]">
         {/* Notebook + TOC tree */}
         <div className="rounded-lg border border-slate-800 bg-slate-950/50 overflow-hidden">
-          <p className="px-4 py-2 text-xs font-medium text-slate-400 border-b border-slate-800 flex items-center gap-1.5">
+          <p className="px-4 py-2 text-sm font-medium text-slate-300 border-b border-slate-800 flex items-center gap-1.5">
             <BookOpen className="h-3.5 w-3.5" /> Notebooks
           </p>
           {loading ? (
-            <div className="p-4 flex items-center gap-2 text-slate-400 text-sm">
+            <div className="p-4 flex items-center gap-2 text-slate-300 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading...
             </div>
           ) : notebooks.length === 0 ? (
-            <p className="p-4 text-sm text-slate-400">
+            <p className="p-4 text-sm text-slate-300">
               No notebooks found. Sign in with your Microsoft account first.
             </p>
           ) : (
@@ -442,19 +442,19 @@ export function Notebooks() {
             </ul>
           )}
           {tocLoading && (
-            <div className="p-4 flex items-center gap-2 text-slate-400 text-sm">
+            <div className="p-4 flex items-center gap-2 text-slate-300 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading sections...
             </div>
           )}
           {toc && !tocLoading && (
             <div className="max-h-[320px] overflow-y-auto">
-              <p className="px-4 py-1.5 text-xs text-slate-400 border-t border-slate-800">
+              <p className="px-4 py-1.5 text-sm text-slate-300 border-t border-slate-800">
                 {toc.stats.sections} sections · {toc.stats.pages} pages
               </p>
               {tocWarnings.length > 0 && (
                 <p
                   data-testid="toc-warnings"
-                  className="px-4 py-1.5 text-xs text-amber-300 border-t border-slate-800"
+                  className="px-4 py-1.5 text-sm text-amber-300 border-t border-slate-800"
                 >
                   Partial load: {tocWarnings.join(" ")} — retry to fetch the
                   rest.
@@ -465,7 +465,7 @@ export function Notebooks() {
                   <p className="px-4 py-1.5 text-sm font-medium text-slate-300 flex items-center gap-1.5">
                     <FolderOpen className="h-3.5 w-3.5 text-blue-400" />
                     {sec.name}
-                    <span className="text-slate-500">({sec.pageCount})</span>
+                    <span className="text-slate-300">({sec.pageCount})</span>
                   </p>
                   {sec.pages.map((pg) => (
                     <button
@@ -479,7 +479,7 @@ export function Notebooks() {
                       }`}
                       onClick={() => openPage(pg.id)}
                     >
-                      <ChevronRight className="h-3 w-3 text-slate-500 shrink-0" />
+                      <ChevronRight className="h-3 w-3 text-slate-300 shrink-0" />
                       <span className="truncate">
                         {pg.title || "(untitled)"}
                       </span>
@@ -494,7 +494,7 @@ export function Notebooks() {
         {/* Page viewer */}
         <div className="rounded-lg border border-slate-800 bg-slate-950/50 overflow-hidden">
           {pageLoading ? (
-            <div className="flex items-center justify-center h-64 gap-2 text-slate-400">
+            <div className="flex items-center justify-center h-64 gap-2 text-slate-300">
               <Loader2 className="h-5 w-5 animate-spin" /> Loading page...
             </div>
           ) : selectedPage ? (
@@ -503,7 +503,7 @@ export function Notebooks() {
                 <h3 className="text-lg font-semibold text-white">
                   {selectedPage.title || "(untitled)"}
                 </h3>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-slate-300">
                   Modified {fmtDate(selectedPage.lastModifiedDateTime)}
                 </p>
               </div>
@@ -544,7 +544,7 @@ export function Notebooks() {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-2">
+            <div className="flex flex-col items-center justify-center h-64 text-slate-300 gap-2">
               <FileText className="h-8 w-8" />
               <p className="text-sm">Select a page to view it</p>
             </div>
@@ -562,7 +562,7 @@ export function Notebooks() {
               <h3 className="text-white font-semibold">New page</h3>
               <button
                 type="button"
-                className="text-slate-400 hover:text-slate-200"
+                className="text-slate-300 hover:text-slate-200"
                 onClick={() => setShowCreate(false)}
               >
                 <X className="h-4 w-4" />

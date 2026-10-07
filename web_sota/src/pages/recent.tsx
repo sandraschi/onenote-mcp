@@ -127,10 +127,10 @@ export function Recent() {
                   <span className="text-sm text-slate-200 truncate">
                     <History className="h-3.5 w-3.5 inline mr-1.5 text-emerald-500" />
                     {p.title || "(untitled)"}
-                    <span className="text-slate-400"> · {p.notebook}</span>
-                    <span className="text-slate-500"> / {p.section}</span>
+                    <span className="text-slate-300"> · {p.notebook}</span>
+                    <span className="text-slate-300"> / {p.section}</span>
                   </span>
-                  <span className="text-xs text-slate-400 shrink-0 flex items-center gap-1.5">
+                  <span className="text-sm text-slate-300 shrink-0 flex items-center gap-1.5">
                     <FileText className="h-3.5 w-3.5" />
                     {fmtDate(p.modified)}
                   </span>

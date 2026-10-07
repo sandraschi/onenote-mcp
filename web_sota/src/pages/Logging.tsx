@@ -16,7 +16,7 @@ const LEVEL_COLORS: Record<string, string> = {
   ERROR: "text-red-400 bg-red-950/40",
   WARNING: "text-yellow-400 bg-yellow-950/40",
   INFO: "text-blue-300 bg-blue-950/30",
-  DEBUG: "text-slate-400 bg-slate-900/30",
+  DEBUG: "text-slate-300 bg-slate-900/30",
 };
 
 export default function Logging() {
@@ -170,7 +170,7 @@ export default function Logging() {
         </select>
         <input
           data-testid="log-search"
-          className="h-8 w-48 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300 placeholder:text-slate-400"
+          className="h-8 w-48 rounded border border-slate-700 bg-slate-800 px-2 text-sm text-slate-300 placeholder:text-slate-300"
           placeholder="Search..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
@@ -212,7 +212,7 @@ export default function Logging() {
         >
           Clear
         </button>
-        <span className="text-sm text-slate-400 ml-auto">{total} entries</span>
+        <span className="text-sm text-slate-300 ml-auto">{total} entries</span>
       </div>
 
       {loadError && (
@@ -227,7 +227,7 @@ export default function Logging() {
         className="h-[65vh] overflow-auto rounded-lg border border-slate-800 bg-slate-950 p-3 font-mono text-xs leading-relaxed"
       >
         {entries.length === 0 && !loading && (
-          <div className="text-slate-400 text-center py-12 text-sm">
+          <div className="text-slate-300 text-center py-12 text-sm">
             No log entries
           </div>
         )}
@@ -236,16 +236,16 @@ export default function Logging() {
             key={e.id}
             className="flex gap-3 py-0.5 hover:bg-slate-900/50 rounded px-1"
           >
-            <span className="text-slate-500 w-20 shrink-0">
+            <span className="text-slate-300 w-20 shrink-0">
               {e.timestamp.split(".")[0].split("T")[1] || e.timestamp}
             </span>
             <span
-              className={`w-16 shrink-0 text-center rounded text-[10px] font-bold ${LEVEL_COLORS[e.level] || "text-slate-400"}`}
+              className={`w-16 shrink-0 text-center rounded text-[10px] font-bold ${LEVEL_COLORS[e.level] || "text-slate-300"}`}
             >
               {e.level}
             </span>
             {e.kind && (
-              <span className="text-slate-400 w-16 shrink-0">[{e.kind}]</span>
+              <span className="text-slate-300 w-16 shrink-0">[{e.kind}]</span>
             )}
             <span className="text-slate-300 break-all">{e.detail}</span>
           </div>
@@ -253,7 +253,7 @@ export default function Logging() {
         <div ref={endRef} />
       </div>
 
-      <div className="flex items-center justify-between text-sm text-slate-400">
+      <div className="flex items-center justify-between text-sm text-slate-300">
         <button
           className="px-3 py-1 rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-30"
           disabled={offset <= 0}

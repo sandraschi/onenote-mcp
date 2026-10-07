@@ -179,9 +179,9 @@ export function SearchPage() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-64">
           {searching ? (
-            <Loader2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 animate-spin" />
+            <Loader2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 animate-spin" />
           ) : (
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
           )}
           <input
             data-testid="search-input"
@@ -227,7 +227,7 @@ export function SearchPage() {
               : "Build full-text index"}
           </Button>
           {index && (
-            <span data-testid="index-status" className="text-sm text-slate-400">
+            <span data-testid="index-status" className="text-sm text-slate-300">
               {index.state === "running"
                 ? `Indexing ${index.done} of ${index.total} pages...`
                 : `${index.indexed_pages} pages indexed`}
@@ -297,7 +297,7 @@ export function SearchPage() {
             <button
               type="button"
               aria-label="Clear search"
-              className="text-slate-400 hover:text-slate-200"
+              className="text-slate-300 hover:text-slate-200"
               onClick={() => {
                 setResults(null);
                 setQuery("");
@@ -311,7 +311,7 @@ export function SearchPage() {
           </div>
           {visible.length === 0 ? (
             <p
-              className="p-4 text-sm text-slate-400"
+              className="p-4 text-sm text-slate-300"
               data-testid="search-empty"
             >
               No matching pages.
@@ -331,25 +331,25 @@ export function SearchPage() {
                           <FileText className="h-3.5 w-3.5 inline mr-1.5 text-blue-400" />
                           {p.title || "(untitled)"}
                           {p.notebook && (
-                            <span className="text-slate-400">
+                            <span className="text-slate-300">
                               {" "}
                               · {p.notebook}
                             </span>
                           )}
                           {p.section && (
-                            <span className="text-slate-500">
+                            <span className="text-slate-300">
                               {" "}
                               / {p.section}
                             </span>
                           )}
                         </span>
                         {p.snippet && (
-                          <span className="block text-sm text-slate-400 truncate">
+                          <span className="block text-sm text-slate-300 truncate">
                             …{p.snippet}…
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-slate-400 shrink-0">
+                      <span className="text-sm text-slate-300 shrink-0">
                         {fmtDate(p.lastModifiedDateTime)}
                       </span>
                     </button>
@@ -369,7 +369,7 @@ export function SearchPage() {
                   </button>
                   <p
                     data-testid="search-page-info"
-                    className="text-sm text-slate-400"
+                    className="text-sm text-slate-300"
                   >
                     Page {page + 1} of {pageCount}
                   </p>
