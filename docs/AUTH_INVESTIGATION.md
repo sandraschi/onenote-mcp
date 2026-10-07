@@ -43,7 +43,7 @@ proven healthy via Graph Explorer.** See "Next steps" for the ranked plan.
 1. **Expired-token re-auth** (device flow, built-in Graph Explorer client ID).
    Flow completed, `/me` 200, OneNote 40001. Killed theory: "just expired".
 2. **Own app registration** (`onenote-mcp-local`,
-   `b70aba9c-…-38c4b8048c3d`, personal-accounts-only, Notes.Read.All +
+   `<your-client-id>`, personal-accounts-only, Notes.Read.All +
    Notes.ReadWrite.All + User.Read, public-client-flows on). Same 40001.
    Killed theory: "borrowed client ID".
 3. **Authority `/common` → `/consumers`** (AADSTS9002346 demanded it for a
@@ -127,7 +127,7 @@ Follow-up hardening from the same session: MSAL refresh cache
 expiry and backend restarts self-heal with zero clicks.
 
 ## Appendix: environment that works
-- Backend: `ONENOTE_CLIENT_ID=b70aba9c-…` (or unset for default),
+- Backend: `ONENOTE_CLIENT_ID=<your-client-id>` (or unset for default),
   `ONENOTE_AUTHORITY=https://login.microsoftonline.com/common`
   (multi-tenant app) — debug endpoint confirms live values.
 - App registration needs: Notes.Read.All + Notes.ReadWrite.All + User.Read

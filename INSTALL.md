@@ -9,7 +9,7 @@ Pick the one that matches how you want to use OneNote MCP.
 | My notes in **Cursor, VS Code, Claude Code** or another AI tool | [C. Other AI tools](#c-other-ai-tools-cursor-vs-code-claude-code) |
 | To work on the code | [D. For developers](#d-for-developers) |
 
-Whichever you pick, you sign in to your Microsoft account **once** (see [First use](#first-use-sign-in)).
+Whichever you pick, there are three one-time setup steps afterwards (see [First use](#first-use-three-one-time-steps)).
 
 ---
 
@@ -78,16 +78,23 @@ claude mcp add onenote -- uvx --from git+https://github.com/sandraschi/onenote-m
 
 ---
 
-## First use: sign in
+## First use: three one-time steps
 
-OneNote data comes from your Microsoft account, so you sign in once:
+Installing is not the end: the app running does **not** yet let Claude, Cursor or any AI tool use your
+notes. Open the app (the dashboard shows a red **Complete setup** button until you are done):
 
-- **In Claude / your AI tool:** ask *"Sign in to my OneNote"*. You get a short code and the page
-  `https://microsoft.com/devicelogin`; enter the code there.
-- **In the Windows app:** *Notebooks* page, **Sign in with Microsoft**.
+1. **Register your own Microsoft app** - free, about 5 minutes. Microsoft requires every user to
+   have their own. The dashboard walks you through it in the Azure portal and has a box to paste
+   the *Application (client) ID* into. (Settings > Microsoft app registration changes it later.)
+2. **Sign in to your OneNote** - approve access once in your browser. The session renews itself
+   for about 90 days.
+3. **Connect your AI tools** - the dashboard and Settings > AI tools list the tools found on your
+   computer (Claude Desktop, Cursor, Antigravity, Windsurf, OpenCode, Claude Code) with a
+   checkbox each. Restart those tools afterwards.
 
-Personal Microsoft accounts work. The session renews itself, so you stay signed in for about 90 days.
-More detail: [docs/ONBOARDING.md](docs/ONBOARDING.md).
+Everything the app stores (your registration, sign-in, search index) lives in
+`%LOCALAPPDATA%\com.sandraschi.onenote-mcp`, shared with the AI tools you connect, so they reuse your
+sign-in. More detail: [docs/ONBOARDING.md](docs/ONBOARDING.md).
 
 ---
 

@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.3.0] - 2026-10-07
+
+### Added
+- **Guided onboarding on the dashboard** (red "Complete setup" button until done, three steps):
+  1. register your own free Microsoft app - guided, with a box for the client ID (each user must have
+     their own; stored in the app-data folder, no `.env` editing), 2. sign in to your OneNote,
+  3. connect your AI tools. The banner states plainly that the app and backend running does not
+  give Claude/Cursor access.
+- **Settings > AI tools** panel and `GET/POST /api/mcp-clients[/register|/unregister]`: detect,
+  register and remove OneNote MCP in Claude Desktop, Cursor, Antigravity, Windsurf, OpenCode and
+  Claude Code at any time (same engine as the installer page).
+- `GET/POST /api/auth/config` and Settings > Microsoft app registration.
+
+### Security
+- **Secrets are encrypted at rest** with Windows DPAPI (current-user): the Microsoft client ID, the
+  sign-in cache (refresh token) and the access-token file. Other users, backups and copied folders
+  cannot read them; existing plaintext files migrate on next write. The client ID is never returned
+  by the API (only its last 4 characters) and the UI field never shows it again.
+- Removed a partial client-ID reference from `docs/AUTH_INVESTIGATION.md`.
+
+### Fixed
+- **Installed app kept its sign-in cache, search index and exports in the temp folder.** They now
+  live in `%LOCALAPPDATA%\com.sandraschi.onenote-mcp`, shared with the stdio process an AI client
+  starts. (Source checkouts still use the repo root.) Existing installed-app users sign in again once.
+- **Browser sign-in used a hardcoded dev port (10907)**; the installed app's backend listens on
+  11250. The redirect now follows the backend's own port.
+- The borrowed Graph Explorer client ID default is gone (its tokens are rejected for OneNote);
+  without a registration the app says what to do instead of failing obscurely.
+- Registering in Claude Code from the installer script errored under Windows PowerShell 5.1, and
+  the installer's config-safety check wrongly skipped configs containing a `/*` inside a string.
+- Dashboard hero showed a hardcoded "16 MCP tools" (actual count is shown now).
+
 ## [1.2.0] - 2026-10-07
 
 ### Added

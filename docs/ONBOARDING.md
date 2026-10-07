@@ -1,7 +1,11 @@
 # Onboarding
 
-OneNote MCP talks to your Microsoft account through the Graph API, so the only
-real setup step is signing in. Everything else is clone-and-run.
+OneNote MCP talks to your Microsoft account through the Graph API. Three one-time steps:
+(1) register your own free Microsoft app, (2) sign in with it, (3) connect your AI tools.
+In the app, the dashboard guides all three (red **Complete setup** button) and stores the result
+in the app-data folder (`%LOCALAPPDATA%\com.sandraschi.onenote-mcp`; a source checkout uses the repo root),
+so no `.env` editing is needed. The manual route below is for developers; the
+`ONENOTE_CLIENT_ID` / `ONENOTE_AUTHORITY` environment variables still override the stored values.
 
 ## Prerequisites
 
