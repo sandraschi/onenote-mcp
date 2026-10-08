@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$target = Join-Path $PSScriptRoot 'web_sota' 'start.ps1'
+$target = Join-Path (Join-Path $PSScriptRoot 'web_sota') 'start.ps1'
 if (-not (Test-Path -LiteralPath $target)) {
     Write-Host "ERROR: Missing web_sota/start.ps1 at $target" -ForegroundColor Red
     exit 1
