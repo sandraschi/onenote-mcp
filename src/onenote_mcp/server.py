@@ -646,7 +646,7 @@ _FLEET_APPS: tuple[dict[str, Any], ...] = (
     {"name": "obsidian-mcp", "port": 10890, "description": "Web dashboard frontend"},
     {"name": "yahboom-mcp", "port": 10893, "description": "Web dashboard frontend"},
     {"name": "dreame-mcp", "port": 10895, "description": "Web dashboard frontend"},
-    {"name": "mywienerlinien", "port": 10896, "description": "Webapp dashboard"},
+    {"name": "publictransport-mcp", "port": 10896, "description": "Webapp dashboard"},
 )
 
 _TAGGED_SKILLS: list[dict[str, str]] = [{"name": "onenote", "uri": "skill://onenote"}]
